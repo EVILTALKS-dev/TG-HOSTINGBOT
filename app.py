@@ -26,8 +26,8 @@ ADMIN_IDS = {8066849679}
 ADMIN_CHANNEL_ID = -1003729608203  # your private admin channel id
 
 FORCE_JOIN = {
-    'channel': {'id': 'https://t.me/+N6ZHX46DKbA1YjA1', 'name': ' 📟 Pvt Channel'},
-    'group': {'id': '@ETOFFICIALS', 'name': ' ⭐ Main Channel'}
+    'channel': {'id': '@ETOFFICIALS', 'name': ' 📟 Main Channel'},
+    'group': {'id': '@EVILXGC', 'name': ' ⭐ Main Group'}
 }
 
 # ==================== SETUP ====================
