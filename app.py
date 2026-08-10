@@ -1174,7 +1174,7 @@ def show_help(message):
         "📊 <b>STATISTICS:</b>\n"
         " • View system and script analytics.\n\n"
         "────────────────────────────\n"
-        "📢 Support: @Y2H4CK"
+        "📢 Support: @EVILTALKS"
     )
     safe_send(message.chat.id, help_text, parse_mode="HTML")
 
