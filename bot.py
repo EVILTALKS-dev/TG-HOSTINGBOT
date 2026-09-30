@@ -9,6 +9,7 @@ import os as _bootstrap_os
 import sys as _bootstrap_sys
 import subprocess as _bootstrap_subprocess
 import importlib.util as _bootstrap_importlib
+import importlib.metadata as _bootstrap_metadata
 
 _BOOTSTRAP_DIR = _bootstrap_os.path.join(_bootstrap_os.path.abspath(_bootstrap_os.path.dirname(__file__)), ".jexxy_packages")
 _bootstrap_os.makedirs(_BOOTSTRAP_DIR, exist_ok=True)
@@ -18,7 +19,18 @@ if _BOOTSTRAP_DIR not in _bootstrap_sys.path:
 def _ensure_bootstrap_package(module_name, package_name):
     try:
         if _bootstrap_importlib.find_spec(module_name) is not None:
-            return True
+            # Custom-emoji button icons require a recent pyTelegramBotAPI.
+            # Upgrade it when an older copy is already installed.
+            if module_name == "telebot":
+                try:
+                    _v = _bootstrap_metadata.version("pyTelegramBotAPI")
+                    _parts = tuple(int(x) for x in _v.split('.')[:3])
+                    if _parts >= (4, 33, 0):
+                        return True
+                except Exception:
+                    pass
+            else:
+                return True
     except Exception:
         pass
     try:
@@ -48,18 +60,19 @@ def _ensure_bootstrap_package(module_name, package_name):
 # These are required by the hosting bot itself. Uploaded-file dependencies
 # are handled later by ensure_python_dependencies().
 _BOOTSTRAP_DEPS = {
-    "telebot": "pyTelegramBotAPI",
+    "telebot": "pyTelegramBotAPI>=4.33.0",
     "psutil": "psutil",
     "requests": "requests",
     "flask": "Flask",
 }
 for _mod, _pkg in _BOOTSTRAP_DEPS.items():
     if not _ensure_bootstrap_package(_mod, _pkg):
-        raise RuntimeError(f"Required dependency '{_mod}' is unavailable. Install package '{_pkg}' and restart.")
+        raise RuntimeError(f"Required dependency '{_mod}'is unavailable. Install package '{_pkg}'and restart.")
 
 # --- End JEXXY dependency bootstrap ---
 
 import telebot
+from html import escape as _html_escape
 import subprocess
 import os
 import zipfile
@@ -84,6 +97,8 @@ import struct
 import random
 import ast
 import importlib.util
+import uuid
+from types import SimpleNamespace
 
 # --- Flask Keep Alive ---
 from flask import Flask
@@ -93,11 +108,16 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "⚡ EvilHosts — Online & Blazing"
+    return "JexxyCloudBot — Online & Blazing"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
-    app.run(host='0.0.0.0', port=port)
+    try:
+        app.run(host='0.0.0.0', port=port)
+    except OSError as e:
+        # On platforms that already provide a web listener, the bot itself
+        # must keep polling instead of failing because the port is occupied.
+        logger.warning(f"Keep-alive web server not started on port {port}: {e}")
 
 def keep_alive():
     t = Thread(target=run_flask)
@@ -110,12 +130,86 @@ def keep_alive():
 #  CONFIGURATION
 # ══════════════════════════════════════════════════════
 TOKEN          = '8843932282:AAF8Vzm9yTlh0IeMLRwKbP-0G8wMbYOq4Go'
-OWNER_ID       = 8066849679
+OWNER_ID         = 8066849679
 ADMIN_ID       = 8066849679
-YOUR_USERNAME  = '@EVILTALKS'
-BOT_NAME       = "EVIL HOSTS BOT"
+YOUR_USERNAME  = '@EVILTALKS"
+BOT_NAME       = "𝐄𝐯𝐢𝐥 𝐇𝐨𝐬𝐭"
 BOT_USERNAME   = "@EvilHostsBot"
-CREDIT         = "𝗘𝘃𝗶𝗹𝘁𝗮𝗹𝗸𝘀"
+CREDIT         = "@EVILTALKS"
+
+# Telegram Premium Custom Emoji — supplied by owner
+# IDs are kept in one place so the UI can be changed without touching handlers.
+# IMPORTANT: Telegram requires the text inside <tg-emoji> to be a real emoji
+# alternative. The previous version used symbols such as ◆/◇/◉, which can make
+# the custom-emoji entity invalid. These fallbacks are valid emoji alternatives.
+def _pe(emoji_id, fallback="•"):
+    return f'<tg-emoji emoji-id="{emoji_id}">{fallback}</tg-emoji>'
+
+PE_SIGNAL  = _pe("6239930832128056797", "⚡")
+PE_WELCOME = _pe("4958832114540741368", "👋")
+PE_WELCOME_TEXT = _pe("5244688958620710085", "✨")
+PE_COMMANDS = _pe("6026239398650056451", "📋")
+PE_FAST = _pe("5379879303439739169", "🚀")
+PE_CREDITS = _pe("5823319287883896508", "💎")
+PE_OWNER_ID = _pe("5798743308922523679", "👑")
+PE_POWERED = _pe("5258093637450866522", "⚙️")
+PE_ADMIN = _pe("6091259474025126934", "🛡️")
+PE_ADMIN_ACTION = _pe("6129805886383723340", "🔧")
+PE_USER_SEE = _pe("5774007681731795134", "👁️")
+PE_BROADCAST = _pe("5388704211397522006", "📢")
+PE_REDEEM = _pe("5294500065174365378", "🎟️")
+PE_LOADING = _pe("5215579104807497179", "⏳")
+PE_LOADING2 = _pe("5983299943417257042", "🔄")
+PE_SUCCESS = _pe("5985652692142266021", "✅")
+
+PE_OK = PE_SUCCESS
+PE_DEV = PE_SIGNAL
+PE_OWNER = PE_ADMIN
+PE_VIEW = PE_USER_SEE
+PE_TIME = PE_LOADING2
+PE_PANEL = PE_ADMIN
+PE_STATUS = PE_VIEW
+PE_ACTION = PE_ADMIN_ACTION
+PE_BRAND = PE_ADMIN
+PE_DANCE = PE_ACTION
+PE_STAR = PE_OK
+PE_STAR2 = PE_VIEW
+PE_STAR3 = PE_OWNER
+PE_WAIT = PE_TIME
+
+PREMIUM_BUTTON_IDS = {
+    "ok": "5985652692142266021", "dev": "6239930832128056797",
+    "owner": "6091259474025126934", "view": "5774007681731795134",
+    "time": "5983299943417257042", "dance": "6129805886383723340",
+    "star": "5985652692142266021", "star2": "5774007681731795134",
+    "star3": "6091259474025126934", "wait": "5983299943417257042",
+    "status": "5774007681731795134",
+}
+
+_InlineKeyboardButton = types.InlineKeyboardButton
+_KeyboardButton = types.KeyboardButton
+
+def premium_inline_button(text: str, callback_data: str = None, url: str = None, icon_key: str = "ok") -> types.InlineKeyboardButton:
+    """Create a functional button with a Premium custom-emoji icon when supported.
+
+    Telegram can reject custom-emoji button icons for accounts/chats that do not
+    meet its Premium/Fragment eligibility rules, so creation falls back to a
+    normal button without breaking the keyboard.
+    """
+    kwargs = {"text": text}
+    if url:
+        kwargs["url"] = url
+    else:
+        kwargs["callback_data"] = callback_data or "noop"
+
+    emoji_id = PREMIUM_BUTTON_IDS.get(icon_key) or PREMIUM_BUTTON_IDS.get("ok")
+    try:
+        return types.InlineKeyboardButton(
+            icon_custom_emoji_id=emoji_id,
+            **kwargs,
+        )
+    except Exception:
+        return types.InlineKeyboardButton(**kwargs)
 
 # Credits config
 FREE_CREDITS      = 2       # credits given to every new user
@@ -123,7 +217,7 @@ REFERRAL_BONUS    = 5       # credits referrer earns per successful referral
 UPLOAD_COST       = 1       # credits consumed per file upload
 
 # Welcome video
-WELCOME_VIDEO_URL = 'https://t.me/EVILTALKSBOTKALIYEVIDEOS/2'
+WELCOME_VIDEO_URL = 'https://t.me/JEXXYKABOTKELIYAVIDOCHANNNELE/6'  # final welcome video
 
 # Folder setup
 BASE_DIR         = os.path.abspath(os.path.dirname(__file__))
@@ -138,26 +232,67 @@ os.makedirs(DATA_DIR, exist_ok=True)
 bot = telebot.TeleBot(TOKEN)
 
 # --- Telegram formatting safety ---
-# Telegram's legacy Markdown parser rejects filenames, logs and user-provided
-# errors containing unmatched _, *, `, [, etc.  Keep the premium formatting,
-# but automatically retry the same message as plain text when entity parsing
-# fails. This prevents a bad filename/runtime log from breaking the hosting flow.
+# Keep custom emoji intact. Telegram supports <tg-emoji> in HTML messages,
+# but custom emoji entities must not be nested inside a <blockquote>.
+# premium_card() below therefore uses a flat HTML layout.
 def _is_entity_parse_error(exc):
     text = str(exc).lower()
-    return ('can\'t parse entities' in text or 'cant parse entities' in text
-            or 'parse entities' in text)
+    return ("can't parse entities" in text or "cant parse entities" in text
+            or "parse entities" in text or "entity_text_invalid" in text)
+
+def _strip_tg_emoji(html_text: str) -> str:
+    """Fallback only: remove custom-emoji tags while preserving their fallback emoji."""
+    return re.sub(r'<tg-emoji[^>]*>(.*?)</tg-emoji>', r'\1', str(html_text))
 
 def _safe_wrap_method(obj, method_name):
     original = getattr(obj, method_name)
+
     def wrapped(*args, **kwargs):
         try:
             return original(*args, **kwargs)
         except Exception as exc:
-            if not _is_entity_parse_error(exc) or kwargs.get('parse_mode') is None:
+            if not _is_entity_parse_error(exc):
                 raise
+
+            # Retry only as a last-resort compatibility fallback. The normal
+            # path keeps custom emoji enabled.
             retry_kwargs = dict(kwargs)
-            retry_kwargs.pop('parse_mode', None)
-            return original(*args, **retry_kwargs)
+
+            if method_name == 'send_message':
+                new_args = list(args)
+                if len(new_args) >= 2:
+                    new_args[1] = _strip_tg_emoji(new_args[1])
+                elif 'text' in retry_kwargs:
+                    retry_kwargs['text'] = _strip_tg_emoji(retry_kwargs['text'])
+
+            elif method_name == 'edit_message_text':
+                new_args = list(args)
+                if new_args:
+                    new_args[0] = _strip_tg_emoji(new_args[0])
+                elif 'text' in retry_kwargs:
+                    retry_kwargs['text'] = _strip_tg_emoji(retry_kwargs['text'])
+
+            elif method_name in ('send_photo', 'send_video', 'send_document'):
+                new_args = list(args)
+                # chat_id, media, caption, ...
+                if len(new_args) >= 3 and new_args[2]:
+                    new_args[2] = _strip_tg_emoji(new_args[2])
+                elif 'caption' in retry_kwargs and retry_kwargs['caption']:
+                    retry_kwargs['caption'] = _strip_tg_emoji(retry_kwargs['caption'])
+
+            elif method_name == 'edit_message_caption':
+                new_args = list(args)
+                if new_args:
+                    new_args[0] = _strip_tg_emoji(new_args[0])
+                elif 'caption' in retry_kwargs and retry_kwargs['caption']:
+                    retry_kwargs['caption'] = _strip_tg_emoji(retry_kwargs['caption'])
+
+            else:
+                new_args = list(args)
+
+            # Never loop through our wrapper again; call the original method.
+            return original(*new_args, **retry_kwargs)
+
     setattr(obj, method_name, wrapped)
 
 for _method in ('send_message', 'send_photo', 'send_video', 'send_document',
@@ -166,6 +301,28 @@ for _method in ('send_message', 'send_photo', 'send_video', 'send_document',
         _safe_wrap_method(bot, _method)
     except Exception:
         pass
+
+# Every ordinary reply is promoted to the same JEXXY CLOUD visual language.
+# Existing premium HTML cards are passed through untouched.
+_RAW_REPLY_TO = bot.reply_to
+def _jexxy_premium_reply_to(message, text, *args, **kwargs):
+    try:
+        raw = str(text or '')
+        if 'EVIL CLOUD BOT' in raw or '<blockquote>' in raw:
+            return _RAW_REPLY_TO(message, text, *args, **kwargs)
+        markup = kwargs.get('reply_markup')
+        clean = re.sub(r'<[^>]+>', '', raw)
+        clean = clean.replace('\r', '').strip()
+        # Avoid Markdown parser failures from filenames/logs.
+        body = f"{PE_VIEW} <b>{_html_escape(clean[:5000])}</b>"
+        title = 'EVIL CLOUD RESPONSE'
+        return premium_send(message.chat.id, title, body, reply_markup=markup)
+    except Exception:
+        return _RAW_REPLY_TO(message, text, *args, **kwargs)
+try:
+    bot.reply_to = _jexxy_premium_reply_to
+except Exception:
+    pass
 
 # --- Runtime state ---
 bot_scripts       = {}
@@ -178,20 +335,24 @@ bot_locked        = False
 # ══════════════════════════════════════════════════════
 #  AUTO-REACTION POOL
 # ══════════════════════════════════════════════════════
-REACTION_POOL = ['🔥', '⚡', '🤩', '🎉', '💯', '🏆', '👍', '❤️', '🤣', '💀', '😎', '🥳']
+REACTION_POOL = ["🔥"]
 
 def auto_react(message):
-    """Fire a random emoji reaction on any message — silently."""
+    """React to incoming user messages/commands when the installed API supports it."""
     try:
-        emoji = random.choice(REACTION_POOL)
-        # ReactionTypeEmoji available in pyTelegramBotAPI >= 4.14
-        reaction = types.ReactionTypeEmoji(emoji)
-        bot.set_message_reaction(
-            message.chat.id, message.message_id,
-            [reaction], is_big=False
-        )
+        react = getattr(bot, "set_message_reaction", None)
+        reaction_cls = getattr(types, "ReactionTypeEmoji", None)
+        if react and reaction_cls:
+            emoji = random.choice(REACTION_POOL)
+            react(
+                chat_id=message.chat.id,
+                message_id=message.message_id,
+                reaction=[reaction_cls(emoji=emoji)],
+                is_big=False,
+            )
     except Exception:
-        pass  # older API version or not supported — no crash
+        # Reactions are cosmetic; never let them break a command or callback.
+        pass
 
 # ══════════════════════════════════════════════════════
 #  MALWARE DETECTION
@@ -255,7 +416,7 @@ def scan_file(file_content, file_name, user_id):
         return True, "Owner bypass"
     ok, reason = is_suspicious_file(file_content, file_name)
     if ok:
-        logger.warning(f"🚨 Blocked {file_name} from {user_id}: {reason}")
+        logger.warning(f"Blocked {file_name} from {user_id}: {reason}")
         return False, f"Security block: {reason}"
     return True, "Clean"
 
@@ -302,7 +463,7 @@ def init_db():
                       amount INTEGER NOT NULL,
                       balance_after INTEGER,
                       created_at TEXT NOT NULL)''')
-        # Owner is always an admin; additional admins persist across restarts.
+        # Owner is always an admin.
         c.execute('INSERT OR IGNORE INTO admins (user_id) VALUES (?)', (OWNER_ID,))
         # Owner gets infinite marker — we handle in code, but store 999999 in DB
         c.execute('INSERT OR IGNORE INTO credits (user_id, amount) VALUES (?, ?)', (OWNER_ID, 999999))
@@ -459,10 +620,10 @@ def init_user_credits(user_id: int, referred_by: int = None):
         try:
             bot.send_message(
                 referred_by,
-                f"🎁 *Referral Bonus!*\n\n"
+                f" *Referral Bonus!*\n\n"
                 f"Someone joined using your link!\n"
-                f"✅ +{REFERRAL_BONUS} credits added to your account.\n"
-                f"💰 New balance: `{get_credits(referred_by)}`",
+                f" +{REFERRAL_BONUS} credits added to your account.\n"
+                f"New balance: `{get_credits(referred_by)}`",
                 parse_mode='Markdown'
             )
         except Exception:
@@ -535,18 +696,18 @@ def kill_process_tree(process_info):
         logger.error(f"kill_process_tree: {e}", exc_info=True)
 
 def get_user_status_str(user_id: int) -> str:
-    if user_id == OWNER_ID:    return "👑 Owner"
-    if user_id in admin_ids:   return "🛡️ Admin"
+    if user_id == OWNER_ID:    return f"{PE_STATUS} Owner"
+    if user_id in admin_ids:   return f"{PE_STATUS} Admin"
     credits = get_credits(user_id)
-    if credits > 10:           return "💎 Premium"
-    if credits > 0:            return "⭐ User"
-    return "🆓 Free"
+    if credits > 10:           return f"{PE_STAR3} Premium"
+    if credits > 0:            return f"{PE_STAR} User"
+    return "Free"
 
 # ══════════════════════════════════════════════════════
 #  AUTO PACKAGE INSTALLATION
 # ══════════════════════════════════════════════════════
 TELEGRAM_MODULES = {
-    'telebot': 'pyTelegramBotAPI', 'telegram': 'python-telegram-bot',
+    'telebot': 'pyTelegramBotAPI>=4.33.0', 'telegram': 'python-telegram-bot',
     'python_telegram_bot': 'python-telegram-bot', 'aiogram': 'aiogram',
     'pyrogram': 'pyrogram', 'telethon': 'telethon', 'telethon.sync': 'telethon',
     'telepot': 'telepot', 'tgcrypto': 'tgcrypto', 'bs4': 'beautifulsoup4',
@@ -639,7 +800,7 @@ def pip_install_package(pkg, user_folder=None, message=None):
     try:
         env, package_dir = _pip_env(user_folder)
         if message:
-            bot.reply_to(message, f"🐍 Installing `{pkg}`...", parse_mode='Markdown')
+            bot.reply_to(message, f"Installing `{pkg}`...", parse_mode='Markdown')
         r = subprocess.run(
             _pip_command(user_folder, [pkg]),
             cwd=user_folder, env=env,
@@ -650,22 +811,22 @@ def pip_install_package(pkg, user_folder=None, message=None):
                 sys.path.insert(0, package_dir)
             importlib.invalidate_caches()
             if message:
-                bot.reply_to(message, f"✅ `{pkg}` installed locally.", parse_mode='Markdown')
+                bot.reply_to(message, f" `{pkg}` installed locally.", parse_mode='Markdown')
             return True
         err = (r.stderr or r.stdout or 'unknown pip error').strip()
         logger.error(f"pip install {pkg} failed: {err[-4000:]}")
         if message:
-            bot.reply_to(message, f"❌ Install failed for `{pkg}`:\n```\n{err[-2200:]}\n```", parse_mode='Markdown')
+            bot.reply_to(message, f"Install failed for `{pkg}`:\n```\n{err[-2200:]}\n```", parse_mode='Markdown')
         return False
     except subprocess.TimeoutExpired:
         logger.error(f"pip install timeout: {pkg}")
         if message:
-            bot.reply_to(message, f"❌ Install timeout: `{pkg}`", parse_mode='Markdown')
+            bot.reply_to(message, f"Install timeout: `{pkg}`", parse_mode='Markdown')
         return False
     except Exception as e:
         logger.error(f"pip install error {pkg}: {e}", exc_info=True)
         if message:
-            bot.reply_to(message, f"❌ Install error `{pkg}`: {e}")
+            bot.reply_to(message, f"Install error `{pkg}`: {e}")
         return False
 
 
@@ -679,7 +840,7 @@ def install_requirements(user_folder, message=None):
             sys.path.insert(0, package_dir)
         importlib.invalidate_caches()
         if message:
-            bot.reply_to(message, "📦 Installing `requirements.txt` into private package storage...", parse_mode='Markdown')
+            bot.reply_to(message, "Installing `requirements.txt` into private package storage...", parse_mode='Markdown')
         r = subprocess.run(
             _pip_command(user_folder, ['-r', req_path]),
             cwd=user_folder, env=env,
@@ -688,19 +849,19 @@ def install_requirements(user_folder, message=None):
         if r.returncode == 0:
             importlib.invalidate_caches()
             if message:
-                bot.reply_to(message, "✅ Requirements installed.", parse_mode='Markdown')
+                bot.reply_to(message, "Requirements installed.", parse_mode='Markdown')
             return True
         err = (r.stderr or r.stdout or 'unknown pip error').strip()
         logger.error(f"requirements.txt failed: {err[-5000:]}")
         if message:
-            bot.reply_to(message, f"❌ `requirements.txt` failed:\n```\n{err[-2200:]}\n```", parse_mode='Markdown')
+            bot.reply_to(message, f" `requirements.txt` failed:\n```\n{err[-2200:]}\n```", parse_mode='Markdown')
         return False
     except subprocess.TimeoutExpired:
-        if message: bot.reply_to(message, "❌ requirements.txt installation timed out.")
+        if message: bot.reply_to(message, "requirements.txt installation timed out.")
         return False
     except Exception as e:
         logger.error(f"requirements install error: {e}", exc_info=True)
-        if message: bot.reply_to(message, f"❌ Requirements error: {e}")
+        if message: bot.reply_to(message, f"Requirements error: {e}")
         return False
 
 
@@ -740,7 +901,7 @@ def ensure_python_dependencies(script_path, user_folder, message=None):
     if still_missing:
         logger.error(f"Dependencies still missing: {still_missing}")
         if message:
-            bot.reply_to(message, "❌ Missing Python modules after install: " + ', '.join(still_missing))
+            bot.reply_to(message, "Missing Python modules after install: " + ', '.join(still_missing))
         return False
     return True
 
@@ -779,12 +940,15 @@ def _monitor_python_process(key, process, log_path, msg_obj, file_name):
         _close_log(info)
         bot_scripts.pop(key, None)
     reason = _read_log_tail(log_path, 4500)
-    text = (
-        f"❌ `{file_name}` stopped during startup. Exit code: `{rc}`\n\n"
-        f"📜 *Runtime log:*\n```\n{reason[:3500]}\n```"
+    body = (
+        f"{PE_TIME} <b>Startup failed</b>\n\n"
+        f"{PE_VIEW} File : <code>{_html_escape(file_name)}</code>\n"
+        f"{PE_STATUS} Exit code : <code>{rc}</code>\n\n"
+        f"<pre>{_html_escape(reason[:3000])}</pre>"
     )
+    text, markup = premium_card("DEPLOYMENT ERROR", body, copy_value=file_name, copy_label="COPY FILE NAME")
     try:
-        bot.reply_to(msg_obj, text, parse_mode='Markdown')
+        bot.send_message(msg_obj.chat.id, text, reply_markup=markup, parse_mode='HTML')
     except Exception:
         logger.error(text)
 
@@ -792,17 +956,23 @@ def _monitor_python_process(key, process, log_path, msg_obj, file_name):
 def run_script(script_path, owner_id, user_folder, file_name, msg_obj, attempt=1):
     max_attempts = 2
     if attempt > max_attempts:
-        bot.reply_to(msg_obj, f"❌ `{file_name}` failed after {max_attempts} attempts.", parse_mode='Markdown')
+        bot.reply_to(msg_obj, f" `{file_name}` failed after {max_attempts} attempts.", parse_mode='Markdown')
         return
     key = f"{owner_id}_{file_name}"
+    loading_msg = None
     try:
         if not os.path.exists(script_path):
-            bot.reply_to(msg_obj, f"❌ Script `{file_name}` not found."); return
+            bot.reply_to(msg_obj, f"Script `{file_name}` not found."); return
+
+        # Show the premium Python deployment animation before dependency/startup work.
+        loading_msg = premium_loading(msg_obj.chat.id, "PYTHON DEPLOYMENT")
 
         # IMPORTANT: py_compile only checks syntax. It does NOT detect missing imports.
         # Install requirements + all missing imports before starting the real process.
         if attempt == 1:
             if not ensure_python_dependencies(script_path, user_folder, msg_obj):
+                premium_loading_done(msg_obj.chat.id, loading_msg, "DEPLOYMENT FAILED",
+                                     f"{PE_TIME} <b>Dependency installation failed.</b>\n{PE_VIEW} Check the deployment log for details.")
                 return
 
         log_path = os.path.join(user_folder, f"{os.path.splitext(file_name)[0]}.log")
@@ -837,7 +1007,16 @@ def run_script(script_path, owner_id, user_folder, file_name, msg_obj, attempt=1
             'script_owner_id': owner_id, 'start_time': datetime.now(),
             'user_folder': user_folder, 'type': 'py', 'script_key': key
         }
-        bot.reply_to(msg_obj, f"🚀 Starting `{file_name}`... PID: `{process.pid}`", parse_mode='Markdown')
+        premium_loading_done(
+            msg_obj.chat.id, loading_msg, "PYTHON HOSTED",
+            f"{PE_OK} <b>DEPLOYMENT SUCCESSFUL</b>\n\n"
+            f"{PE_DEV} File : <code>{_html_escape(file_name)}</code>\n"
+            f"{PE_VIEW} PID : <code>{process.pid}</code>\n"
+            f"{PE_STATUS} Status : <b>STARTING</b>\n\n"
+            f"{PE_OWNER} EVIL CLOUD • Python engine online",
+            reply_markup=create_control_buttons(owner_id, file_name, False),
+            copy_value=file_name, copy_label="COPY FILE NAME"
+        )
         threading.Thread(
             target=_monitor_python_process,
             args=(key, process, log_path, msg_obj, file_name),
@@ -846,17 +1025,17 @@ def run_script(script_path, owner_id, user_folder, file_name, msg_obj, attempt=1
     except Exception as e:
         if key in bot_scripts:
             kill_process_tree(bot_scripts[key]); bot_scripts.pop(key, None)
-        bot.reply_to(msg_obj, f"❌ Python error: {e}")
+        bot.reply_to(msg_obj, f"Python error: {e}")
 
 def run_js_script(script_path, owner_id, user_folder, file_name, msg_obj, attempt=1):
     max_attempts = 2
     if attempt > max_attempts:
-        bot.reply_to(msg_obj, f"❌ `{file_name}` failed after {max_attempts} attempts.", parse_mode='Markdown')
+        bot.reply_to(msg_obj, f" `{file_name}` failed after {max_attempts} attempts.", parse_mode='Markdown')
         return
     key = f"{owner_id}_{file_name}"
     try:
         if not os.path.exists(script_path):
-            bot.reply_to(msg_obj, f"❌ `{file_name}` not found."); return
+            bot.reply_to(msg_obj, f" `{file_name}` not found."); return
         if attempt == 1:
             check_proc = None
             try:
@@ -878,15 +1057,15 @@ def run_js_script(script_path, owner_id, user_folder, file_name, msg_obj, attemp
                                     args=(script_path, owner_id, user_folder, file_name, msg_obj, attempt+1)
                                 ).start()
                             return
-                    bot.reply_to(msg_obj, f"❌ JS error:\n```\n{stderr[:500]}\n```", parse_mode='Markdown')
+                    bot.reply_to(msg_obj, f"JS error:\n```\n{stderr[:500]}\n```", parse_mode='Markdown')
                     return
             except subprocess.TimeoutExpired:
                 if check_proc and check_proc.poll() is None:
                     check_proc.kill(); check_proc.communicate()
             except FileNotFoundError:
-                bot.reply_to(msg_obj, "❌ Node.js not found. Install it first."); return
+                bot.reply_to(msg_obj, "Node.js not found. Install it first."); return
             except Exception as e:
-                bot.reply_to(msg_obj, f"❌ JS pre-check error: {e}"); return
+                bot.reply_to(msg_obj, f"JS pre-check error: {e}"); return
             finally:
                 if check_proc and check_proc.poll() is None:
                     check_proc.kill(); check_proc.communicate()
@@ -903,11 +1082,11 @@ def run_js_script(script_path, owner_id, user_folder, file_name, msg_obj, attemp
             'start_time': datetime.now(), 'user_folder': user_folder,
             'type': 'js', 'script_key': key
         }
-        bot.reply_to(msg_obj, f"✅ `{file_name}` running! PID: `{process.pid}`", parse_mode='Markdown')
+        bot.reply_to(msg_obj, f" `{file_name}` running! PID: `{process.pid}`", parse_mode='Markdown')
     except Exception as e:
         if key in bot_scripts:
             kill_process_tree(bot_scripts[key]); del bot_scripts[key]
-        bot.reply_to(msg_obj, f"❌ JS error: {e}")
+        bot.reply_to(msg_obj, f"JS error: {e}")
 
 # ══════════════════════════════════════════════════════
 #  DATABASE OPERATIONS
@@ -982,7 +1161,7 @@ def handle_zip_file(content, zip_name, message):
     if user_id != OWNER_ID:
         ok, reason = scan_file(content, zip_name, user_id)
         if not ok:
-            bot.reply_to(message, f"🚨 Blocked: {reason}"); return
+            bot.reply_to(message, f"Blocked: {reason}"); return
     tmp = None
     try:
         tmp = tempfile.mkdtemp(prefix=f"user_{user_id}_zip_")
@@ -993,7 +1172,7 @@ def handle_zip_file(content, zip_name, message):
                 sus_ext = ['.exe', '.dll', '.bat', '.cmd', '.scr', '.com']
                 for m in zr.infolist():
                     if any(m.filename.lower().endswith(e) for e in sus_ext):
-                        bot.reply_to(message, f"🚨 ZIP has suspicious file: {m.filename}"); return
+                        bot.reply_to(message, f"ZIP has suspicious file: {m.filename}"); return
                     mp = os.path.abspath(os.path.join(tmp, m.filename))
                     if not mp.startswith(os.path.abspath(tmp)):
                         raise zipfile.BadZipFile(f"Path traversal: {m.filename}")
@@ -1015,7 +1194,7 @@ def handle_zip_file(content, zip_name, message):
         items   = os.listdir(tmp)
         py_files = [f for f in items if f.endswith('.py')]
         js_files = [f for f in items if f.endswith('.js')]
-        req_file = 'requirements.txt' if 'requirements.txt' in items else None
+        req_file = 'requirements.txt'if 'requirements.txt'in items else None
         pkg_json = 'package.json'     if 'package.json'      in items else None
         if req_file:
             req_src = os.path.join(tmp, req_file)
@@ -1024,7 +1203,7 @@ def handle_zip_file(content, zip_name, message):
             if not install_requirements(user_folder, message):
                 return
         if pkg_json:
-            bot.reply_to(message, "🔄 Installing npm deps...")
+            bot.reply_to(message, "Installing npm deps...")
             subprocess.run(
                 ['npm', 'install'], cwd=tmp,
                 capture_output=True, text=True, encoding='utf-8', errors='ignore'
@@ -1056,11 +1235,11 @@ def handle_zip_file(content, zip_name, message):
                         except Exception: pass
             handle_js_file(dst, user_id, user_folder, main_js, message)
         else:
-            bot.reply_to(message, "❌ No `.py` or `.js` file found in ZIP.")
+            bot.reply_to(message, "No `.py` or `.js` file found in ZIP.")
     except zipfile.BadZipFile as e:
-        bot.reply_to(message, f"❌ Invalid ZIP: {e}")
+        bot.reply_to(message, f"Invalid ZIP: {e}")
     except Exception as e:
-        bot.reply_to(message, f"❌ ZIP error: {e}")
+        bot.reply_to(message, f"ZIP error: {e}")
     finally:
         if tmp and os.path.exists(tmp):
             try: shutil.rmtree(tmp)
@@ -1085,30 +1264,30 @@ def send_to_process_init(message):
         and is_bot_running(v['script_owner_id'], v['file_name'])
     ]
     if not running:
-        bot.reply_to(message, "❌ No running scripts."); return
+        bot.reply_to(message, "No running scripts."); return
     markup = types.InlineKeyboardMarkup(row_width=1)
     for key, info in running:
-        markup.add(types.InlineKeyboardButton(
+        markup.add(premium_inline_button(
             f"{info['file_name']} (UID: {info['script_owner_id']})",
             callback_data=f'sendcmd_select_{key}'
         ))
-    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data='send_command'))
-    bot.reply_to(message, "📝 Select script:", reply_markup=markup)
+    markup.add(premium_inline_button("Back", callback_data='send_command'))
+    bot.reply_to(message, "Select script:", reply_markup=markup)
 
 def process_send_command(message, script_key):
     if script_key not in bot_scripts:
-        bot.reply_to(message, "❌ Script no longer running."); return
+        bot.reply_to(message, "Script no longer running."); return
     info = bot_scripts[script_key]
     try:
         proc = info['process']
         if proc and proc.poll() is None:
             proc.stdin.write(message.text + '\n')
             proc.stdin.flush()
-            bot.reply_to(message, f"✅ Sent to `{info['file_name']}`", parse_mode='Markdown')
+            bot.reply_to(message, f"Sent to `{info['file_name']}`", parse_mode='Markdown')
         else:
-            bot.reply_to(message, f"❌ `{info['file_name']}` not running.", parse_mode='Markdown')
+            bot.reply_to(message, f" `{info['file_name']}` not running.", parse_mode='Markdown')
     except Exception as e:
-        bot.reply_to(message, f"❌ Error: {e}")
+        bot.reply_to(message, f"Error: {e}")
 
 def view_all_logs(message):
     user_id = message.from_user.id
@@ -1120,23 +1299,170 @@ def view_all_logs(message):
                 p = os.path.join(folder, f)
                 logs.append((f, os.path.getsize(p), p))
     if not logs:
-        bot.reply_to(message, "📜 No log files yet."); return
+        bot.reply_to(message, "No log files yet."); return
     markup = types.InlineKeyboardMarkup(row_width=1)
     for lf, sz, _ in sorted(logs):
-        markup.add(types.InlineKeyboardButton(
+        markup.add(premium_inline_button(
             f"{lf} ({sz/1024:.1f} KB)", callback_data=f'viewlog_{user_id}_{lf}'
         ))
-    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data='send_command'))
-    bot.reply_to(message, "📜 *Your Logs:*", reply_markup=markup, parse_mode='Markdown')
+    markup.add(premium_inline_button("Back", callback_data='send_command'))
+    bot.reply_to(message, " *Your Logs:*", reply_markup=markup, parse_mode='Markdown')
 
 def send_log_file(message, log_path, log_filename):
     try:
         if os.path.getsize(log_path) > 50 * 1024 * 1024:
-            bot.reply_to(message, "❌ Log too large (>50 MB)."); return
+            bot.reply_to(message, "Log too large (>50 MB)."); return
         with open(log_path, 'rb') as f:
-            bot.send_document(message.chat.id, f, caption=f"📜 {log_filename}")
+            bot.send_document(message.chat.id, f, caption=f" {log_filename}")
     except Exception as e:
-        bot.reply_to(message, f"❌ Log send error: {e}")
+        bot.reply_to(message, f"Log send error: {e}")
+
+# ══════════════════════════════════════════════════════
+#  PREMIUM RESPONSE UI
+# ══════════════════════════════════════════════════════
+def premium_card(title, body, copy_value=None, copy_label="COPY CODE"):
+    """Consistent JEXXY CLOUD premium card.
+
+    Custom emoji are deliberately kept OUTSIDE blockquote entities because
+    Telegram does not allow the custom-emoji entity to be nested in a
+    blockquote entity. The old card did exactly that, so Telegram rejected
+    the message and the fallback removed every premium emoji.
+    """
+    title = _html_escape(str(title))
+    text = (
+        f"{PE_BRAND}  <b>EVIL CLOUD BOT</b>\n"
+        f"<b>{title}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"{body}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"{PE_DEV} <b>@EVILTALKS</b>"
+    )
+    markup = None
+    if copy_value is not None:
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        try:
+            markup.add(types.InlineKeyboardButton(
+                copy_label,
+                icon_custom_emoji_id=PREMIUM_BUTTON_IDS["ok"],
+                style="success",
+                copy_text=types.CopyTextButton(text=str(copy_value))
+            ))
+        except Exception:
+            markup.add(premium_inline_button(copy_label, callback_data="copy_unavailable"))
+    return text, markup
+
+def premium_send(chat_id, title, body, *, reply_markup=None, copy_value=None, copy_label="COPY CODE", parse_mode="HTML"):
+    text, copy_markup = premium_card(title, body, copy_value, copy_label)
+    if reply_markup is not None and copy_markup is not None:
+        # Keep the functional controls and the copy action in one keyboard.
+        for row in copy_markup.keyboard:
+            reply_markup.keyboard.append(row)
+        copy_markup = reply_markup
+    elif reply_markup is not None:
+        copy_markup = reply_markup
+    return bot.send_message(chat_id, text, reply_markup=copy_markup, parse_mode=parse_mode)
+
+
+def premium_reply(message, title, body, *, reply_markup=None, copy_value=None,
+                  copy_label="COPY CODE"):
+    """Send a consistent JEXXY CLOUD premium card instead of a plain reply."""
+    try:
+        return premium_send(
+            message.chat.id, title, body,
+            reply_markup=reply_markup,
+            copy_value=copy_value,
+            copy_label=copy_label,
+            parse_mode="HTML",
+        )
+    except Exception:
+        # Last-resort plain text fallback so a cosmetic UI issue never breaks a command.
+        return bot.reply_to(message, re.sub(r'<[^>]+>', '', str(body)))
+
+
+def premium_loading(chat_id, title="PYTHON ENGINE", stages=None):
+    """Short, real-time terminal-style loading animation used by hosting actions."""
+    if stages is None:
+        stages = [
+            ("INITIALIZING", 18),
+            ("CHECKING FILE", 36),
+            ("LOADING DEPENDENCIES", 58),
+            ("BOOTING PYTHON", 78),
+            ("VERIFYING PROCESS", 92),
+            ("SYSTEM READY", 100),
+        ]
+    msg = None
+    try:
+        for i, (stage, pct) in enumerate(stages):
+            filled = int(pct / 5)
+            bar = "▰" * filled + "▱" * (20 - filled)
+            body = (
+                f"{PE_DEV} <b>{stage}</b>\n"
+                f"<code>{bar}</code> <b>{pct}%</b>\n\n"
+                f"{PE_VIEW} Engine : <code>PYTHON</code>\n"
+                f"{PE_TIME} Stage  : <code>{i + 1}/{len(stages)}</code>\n"
+                f"{PE_OK} EVIL CLOUD • <i>secure deployment</i>"
+            )
+            text, _ = premium_card(title, body)
+            if msg is None:
+                msg = bot.send_message(chat_id, text, parse_mode="HTML")
+            else:
+                try:
+                    bot.edit_message_text(text, chat_id, msg.message_id, parse_mode="HTML")
+                except Exception:
+                    pass
+            # Keep it visibly animated without adding a long artificial wait.
+            if i < len(stages) - 1:
+                time.sleep(0.18)
+    except Exception:
+        pass
+    return msg
+
+
+def premium_loading_done(chat_id, loading_msg, title, body, reply_markup=None,
+                         copy_value=None, copy_label="COPY CODE"):
+    """Replace the loading card with the final premium result."""
+    text, copy_markup = premium_card(title, body, copy_value, copy_label)
+    markup = reply_markup
+    if markup is None:
+        markup = copy_markup
+    elif copy_markup is not None:
+        for row in copy_markup.keyboard:
+            markup.keyboard.append(row)
+    try:
+        if loading_msg is not None:
+            bot.edit_message_text(text, chat_id, loading_msg.message_id,
+                                  reply_markup=markup, parse_mode="HTML")
+            return loading_msg
+    except Exception:
+        pass
+    return bot.send_message(chat_id, text, reply_markup=markup, parse_mode="HTML")
+
+def sync_user_files(user_id):
+    """Repair the in-memory file index from disk/DB so My Files survives restarts."""
+    folder = get_user_folder(user_id)
+    disk = []
+    if os.path.isdir(folder):
+        for name in os.listdir(folder):
+            path = os.path.join(folder, name)
+            if not os.path.isfile(path) or name.startswith('.') or name.endswith('.log'):
+                continue
+            ext = os.path.splitext(name)[1].lower()
+            if ext == '.py': ft = 'py'
+            elif ext == '.js': ft = 'js'
+            elif ext == '.zip': ft = 'zip'
+            elif name.lower() == 'requirements.txt': ft = 'txt'
+            else: continue
+            disk.append((name, ft))
+    db_files = list(user_files.get(user_id, []))
+    merged = {name: ft for name, ft in db_files}
+    for name, ft in disk: merged[name] = ft
+    valid = [(name, ft) for name, ft in merged.items() if os.path.isfile(os.path.join(folder, name))]
+    user_files[user_id] = sorted(valid, key=lambda x: x[0].lower())
+    # Repair DB records without touching file contents.
+    for name, ft in valid:
+        try: save_user_file(user_id, name, ft)
+        except Exception: pass
+    return user_files.get(user_id, [])
 
 # ══════════════════════════════════════════════════════
 #  MENU BUILDERS — PREMIUM UI
@@ -1144,290 +1470,336 @@ def send_log_file(message, log_path, log_filename):
 def create_main_menu_inline(user_id):
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton('📤 Upload File',  callback_data='upload'),
-        types.InlineKeyboardButton('📂 My Files',     callback_data='check_files'),
+        premium_inline_button('HOST FILE',    callback_data='upload'),
+        premium_inline_button('MY FILES',     callback_data='check_files'),
     )
     markup.add(
-        types.InlineKeyboardButton('⚡ Speed Test',   callback_data='speed'),
-        types.InlineKeyboardButton('📊 Statistics',   callback_data='stats'),
+        premium_inline_button('SPEED TEST',   callback_data='speed'),
+        premium_inline_button('STATISTICS',   callback_data='stats'),
     )
     markup.add(
-        types.InlineKeyboardButton('💎 My Credits',   callback_data='my_credits'),
-        types.InlineKeyboardButton('🔗 Refer Friends', callback_data='refer'),
+        premium_inline_button('MY CREDITS',   callback_data='my_credits'),
+        premium_inline_button('REFER FRIENDS', callback_data='refer'),
     )
     markup.add(
-        types.InlineKeyboardButton('📤 Send Command', callback_data='send_command'),
+        premium_inline_button('Send Command', callback_data='send_command'),
     )
     if user_id in admin_ids:
         markup.add(
-            types.InlineKeyboardButton('💳 Credits Panel', callback_data='credits_panel'),
-            types.InlineKeyboardButton('📢 Broadcast',     callback_data='broadcast'),
+            premium_inline_button('Credits Panel', callback_data='credits_panel'),
+            premium_inline_button('Broadcast',     callback_data='broadcast'),
         )
         markup.add(
-            types.InlineKeyboardButton('🔒 Lock Bot' if not bot_locked else '🔓 Unlock Bot',
-                callback_data='lock_bot' if not bot_locked else 'unlock_bot'),
-            types.InlineKeyboardButton('🟢 Run All',       callback_data='run_all_scripts'),
+            premium_inline_button('Lock Bot'if not bot_locked else 'Unlock Bot',
+                callback_data='lock_bot'if not bot_locked else 'unlock_bot'),
+            premium_inline_button('Run All',       callback_data='run_all_scripts'),
         )
         markup.add(
-            types.InlineKeyboardButton('👑 Admin Panel',   callback_data='admin_panel'),
+            premium_inline_button('Admin Panel',   callback_data='admin_panel'),
         )
     markup.add(
-        types.InlineKeyboardButton(f'💬 Contact — {CREDIT}',
+        premium_inline_button('OPEN MENU', callback_data='back_to_main'),
+        premium_inline_button(f'CONTACT — {CREDIT}',
             url=f'https://t.me/{YOUR_USERNAME.lstrip("@")}')
     )
     return markup
 
 def create_reply_keyboard(user_id):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    is_admin = user_id in admin_ids
-    if is_admin:
-        rows = [
-            ["📤 Upload File",   "📂 My Files"],
-            ["⚡ Speed Test",    "📊 Statistics"],
-            ["💎 My Credits",   "🔗 Refer Friends"],
-            ["💳 Credits Panel", "📢 Broadcast"],
-            ["🔒 Lock Bot",     "🟢 Run All Scripts"],
-            ["📤 Send Command", "👑 Admin Panel"],
-            ["📞 Contact Owner"],
-        ]
-    else:
-        rows = [
-            ["📤 Upload File",  "📂 My Files"],
-            ["⚡ Speed Test",   "📊 Statistics"],
-            ["💎 My Credits",  "🔗 Refer Friends"],
-            ["📤 Send Command", "📞 Contact Owner"],
-        ]
-    for row in rows:
-        markup.add(*[types.KeyboardButton(t) for t in row])
+    """Premium main navigation as a native Telegram reply keyboard.
+
+    The old UI used Telegram's command/menu button plus an inline main panel.
+    The main navigation now lives directly above the message composer.
+    Inline keyboards are still used for file/process/admin sub-actions.
+    """
+    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True, one_time_keyboard=False)
+    markup.row("📤 HOST FILE", "📁 MY FILES")
+    markup.row("🚀 SPEED TEST", "📊 STATISTICS")
+    markup.row("💎 MY CREDITS", "🎁 REFER FRIENDS")
+    markup.row("📨 SEND COMMAND", "👤 CONTACT OWNER")
+    if user_id in admin_ids:
+        markup.row("💳 CREDITS PANEL", "📢 BROADCAST")
+        markup.row(
+            "🔒 LOCK BOT" if not bot_locked else "🔓 UNLOCK BOT",
+            "▶️ RUN ALL",
+        )
+        markup.row("🛡️ ADMIN PANEL")
     return markup
 
 def create_control_buttons(owner_id, file_name, is_running=True):
     markup = types.InlineKeyboardMarkup(row_width=2)
     if is_running:
         markup.row(
-            types.InlineKeyboardButton("🔴 Stop",    callback_data=f'stop_{owner_id}_{file_name}'),
-            types.InlineKeyboardButton("🔄 Restart", callback_data=f'restart_{owner_id}_{file_name}'),
+            premium_inline_button("Stop",    callback_data=f'stop_{owner_id}_{file_name}'),
+            premium_inline_button("Restart", callback_data=f'restart_{owner_id}_{file_name}'),
         )
         markup.row(
-            types.InlineKeyboardButton("🗑️ Delete",  callback_data=f'delete_{owner_id}_{file_name}'),
-            types.InlineKeyboardButton("📜 Logs",    callback_data=f'logs_{owner_id}_{file_name}'),
+            premium_inline_button("Delete",  callback_data=f'delete_{owner_id}_{file_name}'),
+            premium_inline_button("Logs",    callback_data=f'logs_{owner_id}_{file_name}'),
         )
     else:
         markup.row(
-            types.InlineKeyboardButton("🟢 Start",     callback_data=f'start_{owner_id}_{file_name}'),
-            types.InlineKeyboardButton("🗑️ Delete",    callback_data=f'delete_{owner_id}_{file_name}'),
+            premium_inline_button("Start",     callback_data=f'start_{owner_id}_{file_name}'),
+            premium_inline_button("Delete",    callback_data=f'delete_{owner_id}_{file_name}'),
         )
         markup.row(
-            types.InlineKeyboardButton("📜 View Logs", callback_data=f'logs_{owner_id}_{file_name}'),
+            premium_inline_button("View Logs", callback_data=f'logs_{owner_id}_{file_name}'),
         )
-    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data='check_files'))
+    markup.add(premium_inline_button("Back", callback_data='check_files'))
     return markup
 
 def create_admin_panel():
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.row(
-        types.InlineKeyboardButton('➕ Add Admin',    callback_data='add_admin'),
-        types.InlineKeyboardButton('➖ Remove Admin', callback_data='remove_admin'),
+        premium_inline_button('Add Credits', callback_data='add_credits_init'),
+        premium_inline_button('Gen Redeem', callback_data='gen_redeem'),
     )
-    markup.row(types.InlineKeyboardButton('📋 List Admins', callback_data='list_admins'))
-    markup.row(types.InlineKeyboardButton('🔙 Back', callback_data='back_to_main'))
+    markup.row(
+        premium_inline_button('Add Admin', callback_data='add_admin'),
+        premium_inline_button('User See', callback_data='user_see'),
+    )
+    markup.row(premium_inline_button('Broadcast', callback_data='broadcast'))
+    markup.row(
+        premium_inline_button('Remove Admin', callback_data='remove_admin'),
+        premium_inline_button('List Admins', callback_data='list_admins'),
+    )
+    markup.row(premium_inline_button('Back', callback_data='back_to_main'))
     return markup
 
 def create_credits_panel():
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.row(
-        types.InlineKeyboardButton('➕ Add Credits',    callback_data='add_credits_init'),
-        types.InlineKeyboardButton('➖ Remove Credits', callback_data='remove_credits_init'),
+        premium_inline_button('Add Credits',    callback_data='add_credits_init'),
+        premium_inline_button('Remove Credits', callback_data='remove_credits_init'),
     )
-    markup.row(types.InlineKeyboardButton('🔍 Check Credits', callback_data='check_credits_init'))
-    markup.row(types.InlineKeyboardButton('📜 Credit History', callback_data='credit_history'))
-    markup.row(types.InlineKeyboardButton('🔙 Back', callback_data='back_to_main'))
+    markup.row(premium_inline_button('Check Credits', callback_data='check_credits_init'))
+    markup.row(premium_inline_button('Credit History', callback_data='credit_history'))
+    markup.row(premium_inline_button('Back', callback_data='back_to_main'))
     return markup
 
 def create_send_command_menu():
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.row(
-        types.InlineKeyboardButton('📝 Send to Process', callback_data='send_to_process'),
-        types.InlineKeyboardButton('🗂️ View All Logs',   callback_data='view_all_logs'),
+        premium_inline_button('Send to Process', callback_data='send_to_process'),
+        premium_inline_button('View All Logs',   callback_data='view_all_logs'),
     )
-    markup.row(types.InlineKeyboardButton('🔙 Back', callback_data='back_to_main'))
+    markup.row(premium_inline_button('Back', callback_data='back_to_main'))
     return markup
 
 # ══════════════════════════════════════════════════════
 #  LOGIC FUNCTIONS
 # ══════════════════════════════════════════════════════
+def _welcome_inline_menu(user_id, user_id_text, referral_link):
+    """Premium action row shown under the welcome media/message."""
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    try:
+        copy_id = types.InlineKeyboardButton(
+            "COPY ID", icon_custom_emoji_id=PREMIUM_BUTTON_IDS["ok"],
+            style="success", copy_text=types.CopyTextButton(text=user_id_text)
+        )
+        copy_ref = types.InlineKeyboardButton(
+            "COPY REFERRAL", icon_custom_emoji_id=PREMIUM_BUTTON_IDS["star3"],
+            style="primary", copy_text=types.CopyTextButton(text=referral_link)
+        )
+        open_bot = premium_inline_button("OPEN BOT", url=f"https://t.me/{BOT_USERNAME.lstrip('@')}")
+        markup.row(copy_id, copy_ref)
+        markup.row(open_bot)
+    except Exception:
+        markup.row(
+            premium_inline_button("COPY ID", callback_data=f"copy_id_{user_id}"),
+            premium_inline_button("COPY REFERRAL", url=referral_link),
+        )
+    return markup
+
+
 def _logic_send_welcome(message, referrer_id=None):
-    user_id  = message.from_user.id
-    chat_id  = message.chat.id
-    name     = message.from_user.first_name or "User"
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+    name = message.from_user.first_name or "User"
     username = message.from_user.username or "Not set"
 
     if bot_locked and user_id not in admin_ids:
-        bot.send_message(chat_id, "⚠️ Bot is currently locked by admin."); return
+        premium_send(chat_id, "BOT LOCKED", f"{PE_TIME} <b>The hosting panel is temporarily locked by the owner.</b>")
+        return
 
-    # Register user & handle referral
     is_new = user_id not in active_users
     if is_new:
         add_active_user(user_id)
         init_user_credits(user_id, referred_by=referrer_id)
         join_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         try:
-            bot.send_message(
-                OWNER_ID,
-                f"⚡ *New User Alert!*\n\n"
-                f"👤 Name: `{name}`\n"
-                f"✳️ Username: @{username}\n"
-                f"🆔 ID: `{user_id}`\n"
-                f"🕐 Time: `{join_time}`\n"
-                f"🔗 Referred by: `{referrer_id or 'None'}`",
-                parse_mode='Markdown'
+            owner_body = (
+                f"{PE_DEV} <b>Name</b> : <code>{_html_escape(name)}</code>\n"
+                f"{PE_OWNER} <b>Username</b> : <code>@{_html_escape(username)}</code>\n"
+                f"{PE_OK} <b>ID</b> : <code>{user_id}</code>\n"
+                f"{PE_TIME} <b>Time</b> : <code>{join_time}</code>\n"
+                f"{PE_VIEW} <b>Referred by</b> : <code>{_html_escape(str(referrer_id or 'None'))}</code>"
             )
+            owner_text, _ = premium_card("NEW USER ALERT", owner_body)
+            bot.send_message(OWNER_ID, owner_text, parse_mode='HTML')
         except Exception as e:
             logger.error(f"Owner notify failed: {e}")
     else:
-        # Ensure credits entry exists even for returning users
         init_user_credits(user_id)
 
-    credits    = get_credits(user_id)
-    credits_str = "∞" if credits == float('inf') else str(credits)
-    status     = get_user_status_str(user_id)
-    file_count = get_user_file_count(user_id)
-    ref_code   = get_referral_code(user_id)
-    bot_link   = f"https://t.me/{BOT_USERNAME.lstrip('@')}?start={ref_code}"
+    credits = get_credits(user_id)
+    credits_str = "UNLIMITED" if credits == float('inf') else str(credits)
+    status = get_user_status_str(user_id)
+    file_count = len(sync_user_files(user_id))
+    ref_code = get_referral_code(user_id)
+    bot_link = f"https://t.me/{BOT_USERNAME.lstrip('@')}?start={ref_code}"
 
-    welcome_text = (
-        f"╔══════════════════════╗\n"
-        f"║   ⚡ {BOT_NAME} ⚡   ║\n"
-        f"╚══════════════════════╝\n\n"
-        f"👋 Welcome, *{name}*!\n\n"
-        f"🆔 ID: `{user_id}`\n"
-        f"👤 Username: `@{username}`\n"
-        f"🔰 Status: {status}\n"
-        f"💎 Credits: `{credits_str}`\n"
-        f"📁 Files Hosted: `{file_count}`\n\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🚀 Host Python & JS bots here.\n"
-        f"Upload `.py`, `.js`, or `.zip` archives.\n\n"
-        f"🔗 *Your Referral Link:*\n"
-        f"`{bot_link}`\n"
-        f"Refer friends → get *+{REFERRAL_BONUS} credits* each!\n\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"Dev: {CREDIT}"
+    safe_name = _html_escape(str(name))
+    safe_username = _html_escape(str(username))
+    safe_bot_link = _html_escape(bot_link, quote=True)
+    welcome_body = (
+        f"{PE_WELCOME} <b>Welcome, {safe_name}!</b>\n"
+        f"{PE_WELCOME_TEXT} <i>EVIL CLOUDX — Premium Bot Hosting</i>\n\n"
+        f"{PE_FAST} <b>Host your Telegram bots 24/7</b>\n"
+        f"Upload your bot file, let EVIL CLOUDX handle the setup, and keep your bot online without a PC.\n\n"
+        f"{PE_COMMANDS} <b>Quick Commands</b>\n"
+        f"• <code>/deploy</code> — Upload & deploy a bot\n"
+        f"• <code>/mybots</code> — View & manage hosted bots\n"
+        f"• <code>/logs</code> — Check runtime logs\n"
+        f"• <code>/restart</code> — Restart a hosted bot\n"
+        f"• <code>/stop</code> — Stop a hosted bot\n"
+        f"• <code>/help</code> — Hosting help\n\n"
+        f"{PE_CREDITS} <b>Your Credits:</b> <code>{credits_str}</code>\n"
+        f"{PE_VIEW} <b>Hosted Files:</b> <code>{file_count}</code>\n"
+        f"{PE_STATUS} <b>Status:</b> <b>{_html_escape(status)}</b>\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"{PE_OWNER_ID} <b>Owner:</b> {_html_escape(YOUR_USERNAME)}\n"
+        f"{PE_POWERED} <b>Owner ID:</b> <code>{OWNER_ID}</code>\n"
+        f"{PE_POWERED} <b>Engine:</b> <code>Python + Telebot</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"{PE_SIGNAL} <i>Fast • Clean • 24/7 Hosting</i>"
     )
+    # START intentionally has NO inline/reply keyboard. Main controls live in Telegram's official Menu.
+    welcome_text, _ = premium_card("PREMIUM HOSTING PANEL", welcome_body)
 
-    reply_kb = create_reply_keyboard(user_id)
+    # Video caption stays plain because media captions have their own limits.
+    short_caption = f"EVIL CLOUDX\nWelcome, {name}!\nPremium bot hosting panel is ready. Use /menu to open controls."
+
     try:
-        bot.send_video(
-            chat_id, WELCOME_VIDEO_URL,
-            caption=welcome_text,
-            reply_markup=reply_kb,
-            parse_mode='Markdown'
-        )
+        try:
+            bot.send_video(chat_id, WELCOME_VIDEO_URL, caption=short_caption,
+                           has_spoiler=True)
+        except TypeError:
+            bot.send_video(chat_id, WELCOME_VIDEO_URL, caption=short_caption)
     except Exception:
-        bot.send_message(chat_id, welcome_text, reply_markup=reply_kb, parse_mode='Markdown')
+        pass  # video is non-fatal; premium card below always fires
+
+    # Keep custom emoji in the normal HTML message. If Telegram rejects an
+    # entity for any account-specific reason, the global wrapper provides a
+    # plain-emoji fallback automatically.
+    try:
+        bot.send_message(chat_id, welcome_text, parse_mode='HTML')
+    except Exception:
+        bot.send_message(chat_id, re.sub(r'<[^>]+>', '', welcome_text))
 
 def _logic_upload_file(message):
     user_id = message.from_user.id
     if bot_locked and user_id not in admin_ids:
-        bot.reply_to(message, "⚠️ Bot locked. Cannot accept files."); return
+        premium_reply(message, "HOSTING LOCKED", f"{PE_TIME} <b>Hosting is temporarily locked by the owner.</b>")
+        return
     credits = get_credits(user_id)
     if credits == float('inf'):
-        bot.reply_to(message, "📤 Send your `.py`, `.js`, or `.zip` file now.", parse_mode='Markdown')
+        premium_reply(message, "HOST FILE", f"{PE_OK} <b>Send your file now.</b>\n\n{PE_DEV} Accepted: <code>.py</code> <code>.js</code> <code>.zip</code>")
         return
     if credits <= 0:
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton('🔗 Get Credits via Referral', callback_data='refer'))
-        markup.add(types.InlineKeyboardButton(f'💬 Contact Owner', url=f'https://t.me/{YOUR_USERNAME.lstrip("@")}'))
-        bot.reply_to(
-            message,
-            "❌ *No credits left!*\n\n"
-            "Ways to get more credits:\n"
-            f"• 🔗 Refer friends → *+{REFERRAL_BONUS} credits* each\n"
-            f"• 💬 Contact the owner to refill\n",
-            reply_markup=markup, parse_mode='Markdown'
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        markup.add(premium_inline_button('Get Credits via Referral', callback_data='refer'))
+        markup.add(premium_inline_button('Contact Owner', url=f'https://t.me/{YOUR_USERNAME.lstrip("@")}'))
+        premium_reply(
+            message, "CREDITS REQUIRED",
+            f"{PE_TIME} <b>Your credit balance is empty.</b>\n\n"
+            f"{PE_OK} Refer friends → <b>+{REFERRAL_BONUS} credits</b> each\n"
+            f"{PE_OWNER} Contact the owner to refill.",
+            reply_markup=markup,
         )
         return
-    bot.reply_to(
-        message,
-        f"📤 Send your `.py`, `.js`, or `.zip` file now.\n"
-        f"💎 You have `{credits}` credit(s). This upload costs `1`.",
-        parse_mode='Markdown'
+    premium_reply(
+        message, "HOST FILE",
+        f"{PE_DEV} <b>Upload channel ready.</b>\n\n"
+        f"{PE_OK} Send your <code>.py</code>, <code>.js</code> or <code>.zip</code> file now.\n"
+        f"{PE_TIME} Balance: <code>{credits}</code> credit(s)\n"
+        f"{PE_VIEW} Upload cost: <code>1 credit</code>",
     )
 
 def _logic_check_files(message):
     user_id = message.from_user.id
-    files   = user_files.get(user_id, [])
+    files = sync_user_files(user_id)
     if not files:
-        bot.reply_to(message, "📂 No files uploaded yet."); return
+        text, kb = premium_card("MY FILES", f"{PE_VIEW} <b>No hosted files found.</b>\n\n{PE_OK} Upload a <code>.py</code>, <code>.js</code> or <code>.zip</code> file to begin.")
+        bot.send_message(message.chat.id, text, reply_markup=create_main_menu_inline(user_id), parse_mode='HTML')
+        return
     markup = types.InlineKeyboardMarkup(row_width=1)
-    for fn, ft in sorted(files):
-        icon = "🟢" if is_bot_running(user_id, fn) else "🔴"
-        markup.add(types.InlineKeyboardButton(f"{icon} {fn} [{ft}]", callback_data=f'file_{user_id}_{fn}'))
-    bot.reply_to(message, "📂 *Your Files* — tap to manage:", reply_markup=markup, parse_mode='Markdown')
+    for fn, ft in files:
+        running = is_bot_running(user_id, fn)
+        state = f"{PE_OK} RUNNING" if running else f"{PE_TIME} STOPPED"
+        markup.add(premium_inline_button(f"{fn}  •  {ft.upper()}", callback_data=f'file_{user_id}_{fn}'))
+    markup.add(premium_inline_button("BACK TO PANEL", callback_data='back_to_main'))
+    body = f"{PE_VIEW} <b>{len(files)} hosted file(s)</b>\n{PE_OK} Select a file below to start, stop, restart, view logs or delete it.\n\n{PE_TIME} Status is checked live when you open a file."
+    text, _ = premium_card("MY FILES", body, copy_value="EVIL CLOUD BOT")
+    # Put COPY CODE above the file controls.
+    try:
+        markup.keyboard.insert(0, [types.InlineKeyboardButton("COPY CODE", icon_custom_emoji_id=PREMIUM_BUTTON_IDS["ok"], style="success", copy_text=types.CopyTextButton(text="EVIL CLOUD BOT"))])
+    except Exception:
+        pass
+    bot.send_message(message.chat.id, text, reply_markup=markup, parse_mode='HTML')
 
 def _logic_bot_speed(message):
-    t0   = time.time()
-    wait = bot.reply_to(message, "⏱️ Pinging...")
+    t0 = time.time()
+    wait = bot.reply_to(message, f"{PE_TIME} <b>Running secure speed test...</b>", parse_mode='HTML')
     try:
-        ms  = round((time.time() - t0) * 1000, 2)
+        ms = round((time.time() - t0) * 1000, 2)
         uid = message.from_user.id
         lvl = get_user_status_str(uid)
-        text = (
-            f"⚡ *Speed Report*\n"
-            f"━━━━━━━━━━━━━━━\n"
-            f"📶 Ping: `{ms} ms`\n"
-            f"🚦 Bot: {'🔒 Locked' if bot_locked else '🟢 Online'}\n"
-            f"👤 You: {lvl}\n"
-            f"━━━━━━━━━━━━━━━"
+        body = (
+            f"{PE_OK} <b>Ping</b> : <code>{ms} ms</code>\n"
+            f"{PE_VIEW} <b>Bot</b> : <code>{'LOCKED' if bot_locked else 'ONLINE'}</code>\n"
+            f"{PE_OWNER} <b>You</b> : {lvl}"
         )
-        bot.edit_message_text(text, message.chat.id, wait.message_id, parse_mode='Markdown')
+        text, kb = premium_card("SPEED REPORT", body, copy_value=f"Ping: {ms} ms", copy_label="COPY REPORT")
+        bot.edit_message_text(text, message.chat.id, wait.message_id, reply_markup=kb or create_main_menu_inline(uid), parse_mode='HTML')
     except Exception as e:
-        bot.edit_message_text(f"❌ Speed test failed: {e}", message.chat.id, wait.message_id)
+        bot.edit_message_text(f"{PE_TIME} <b>Speed test failed.</b>\n<code>{_html_escape(str(e))}</code>", message.chat.id, wait.message_id, parse_mode='HTML')
 
 def _logic_statistics(message):
     user_id = message.from_user.id
-    running_total = sum(
-        1 for v in bot_scripts.values()
-        if is_bot_running(v['script_owner_id'], v['file_name'])
-    )
-    user_running = sum(
-        1 for v in bot_scripts.values()
-        if v['script_owner_id'] == user_id and is_bot_running(user_id, v['file_name'])
-    )
-    text = (
-        f"📊 *JexxyCloud Stats*\n"
-        f"━━━━━━━━━━━━━━━\n"
-        f"👥 Total Users: `{len(active_users)}`\n"
-        f"📁 Total Files: `{sum(len(v) for v in user_files.values())}`\n"
-        f"🟢 Active Scripts: `{running_total}`\n"
-        f"🤖 Your Scripts: `{user_running}`\n"
+    running_total = sum(1 for v in bot_scripts.values() if is_bot_running(v['script_owner_id'], v['file_name']))
+    user_running = sum(1 for v in bot_scripts.values() if v['script_owner_id'] == user_id and is_bot_running(user_id, v['file_name']))
+    body = (
+        f"{PE_VIEW} <b>Total Users</b> : <code>{len(active_users)}</code>\n"
+        f"{PE_DEV} <b>Total Files</b> : <code>{sum(len(v) for v in user_files.values())}</code>\n"
+        f"{PE_OK} <b>Active Scripts</b> : <code>{running_total}</code>\n"
+        f"{PE_TIME} <b>Your Scripts</b> : <code>{user_running}</code>\n"
     )
     if user_id in admin_ids:
-        text += f"🔒 Bot Lock: `{'On' if bot_locked else 'Off'}`\n"
-        text += f"💎 Credit Records: `{len(user_credits_cache)}`\n"
-    text += f"━━━━━━━━━━━━━━━\nDev: {CREDIT}"
-    bot.reply_to(message, text, parse_mode='Markdown')
+        body += f"{PE_STATUS} <b>Bot Lock</b> : <code>{'ON' if bot_locked else 'OFF'}</code>\n"
+        body += f"{PE_OK} <b>Credit Records</b> : <code>{len(user_credits_cache)}</code>\n"
+    body += f"\n{PE_DEV} <b>DEV</b> : {_html_escape(CREDIT)}"
+    premium_reply(message, "EVIL CLOUD STATISTICS", body)
 
 def _logic_my_credits(message):
     user_id = message.from_user.id
     credits = get_credits(user_id)
-    credits_str = "∞ (Unlimited)" if credits == float('inf') else str(credits)
+    credits_str = "∞ (Unlimited)"if credits == float('inf') else str(credits)
     status  = get_user_status_str(user_id)
     ref_code = get_referral_code(user_id)
     bot_link = f"https://t.me/{BOT_USERNAME.lstrip('@')}?start={ref_code}"
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton('🔗 Share Referral Link', url=bot_link))
-    markup.add(types.InlineKeyboardButton(f'💬 Refill Credits — {CREDIT}', url=f'https://t.me/{YOUR_USERNAME.lstrip("@")}'))
+    markup.add(premium_inline_button('Share Referral Link', url=bot_link))
+    markup.add(premium_inline_button(f'Refill Credits — {CREDIT}', url=f'https://t.me/{YOUR_USERNAME.lstrip("@")}'))
     bot.reply_to(
         message,
-        f"💎 *Your Credit Balance*\n"
+        f" *Your Credit Balance*\n"
         f"━━━━━━━━━━━━━━━\n"
-        f"🔰 Status: {status}\n"
-        f"💰 Credits: `{credits_str}`\n\n"
-        f"📌 *How to earn more:*\n"
+        f"Status: {status}\n"
+        f"Credits: `{credits_str}`\n\n"
+        f" *How to earn more:*\n"
         f"• Share referral link → `+{REFERRAL_BONUS}` per join\n"
         f"• Contact owner to refill\n\n"
-        f"🔗 Your referral link:\n`{bot_link}`\n"
+        f"Your referral link:\n`{bot_link}`\n"
         f"━━━━━━━━━━━━━━━",
         reply_markup=markup, parse_mode='Markdown'
     )
@@ -1437,47 +1809,47 @@ def _logic_refer(message):
     ref_code = get_referral_code(user_id)
     bot_link = f"https://t.me/{BOT_USERNAME.lstrip('@')}?start={ref_code}"
     markup   = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton('🔗 Share This Link', url=bot_link))
+    markup.add(premium_inline_button('Share This Link', url=bot_link))
     bot.reply_to(
         message,
-        f"🔗 *Your Referral Link*\n"
+        f" *Your Referral Link*\n"
         f"━━━━━━━━━━━━━━━\n"
         f"`{bot_link}`\n\n"
-        f"📌 For every friend who joins using your link:\n"
-        f"✅ You earn *+{REFERRAL_BONUS} credits*\n"
-        f"✅ They get *{FREE_CREDITS} free credits* to start\n\n"
-        f"Share & stack that bag! 💰",
+        f"For every friend who joins using your link:\n"
+        f"You earn *+{REFERRAL_BONUS} credits*\n"
+        f"They get *{FREE_CREDITS} free credits* to start\n\n"
+        f"Share & stack that bag! ",
         reply_markup=markup, parse_mode='Markdown'
     )
 
 def _logic_contact_owner(message):
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton(f'💬 DM {CREDIT}', url=f'https://t.me/{YOUR_USERNAME.lstrip("@")}'))
-    bot.reply_to(message, "📞 Tap below to reach the developer:", reply_markup=markup)
+    markup.add(premium_inline_button(f'DM {CREDIT}', url=f'https://t.me/{YOUR_USERNAME.lstrip("@")}'))
+    bot.reply_to(message, "Tap below to reach the developer:", reply_markup=markup)
 
 def _logic_credits_panel(message):
     if message.from_user.id not in admin_ids:
-        bot.reply_to(message, "⚠️ Admin only."); return
-    bot.reply_to(message, "💳 *Credits Manager*", reply_markup=create_credits_panel(), parse_mode='Markdown')
+        bot.reply_to(message, "Admin only."); return
+    bot.reply_to(message, " *Credits Manager*", reply_markup=create_credits_panel(), parse_mode='Markdown')
 
 def _logic_broadcast_init(message):
     if message.from_user.id not in admin_ids:
-        bot.reply_to(message, "⚠️ Admin only."); return
-    msg = bot.reply_to(message, "📢 Send your broadcast message. /cancel to abort.")
+        bot.reply_to(message, "Admin only."); return
+    msg = bot.reply_to(message, "Send your broadcast message. /cancel to abort.")
     bot.register_next_step_handler(msg, process_broadcast_message)
 
 def _logic_toggle_lock_bot(message):
     if message.from_user.id not in admin_ids:
-        bot.reply_to(message, "⚠️ Admin only."); return
+        bot.reply_to(message, "Admin only."); return
     global bot_locked
     bot_locked = not bot_locked
-    status = "🔒 Locked" if bot_locked else "🟢 Unlocked"
+    status = "Locked"if bot_locked else "Unlocked"
     bot.reply_to(message, f"Bot is now *{status}*.", parse_mode='Markdown')
 
 def _logic_admin_panel(message):
     if message.from_user.id not in admin_ids:
-        bot.reply_to(message, "⚠️ Admin only."); return
-    bot.reply_to(message, "👑 *Admin Panel*", reply_markup=create_admin_panel(), parse_mode='Markdown')
+        bot.reply_to(message, "Admin only."); return
+    bot.reply_to(message, " *Admin Panel*", reply_markup=create_admin_panel(), parse_mode='Markdown')
 
 def _logic_run_all_scripts(moc):
     if isinstance(moc, types.Message):
@@ -1489,8 +1861,8 @@ def _logic_run_all_scripts(moc):
         msg_for_script = moc.message
         reply = lambda t, **kw: bot.send_message(moc.message.chat.id, t, **kw)
     if uid not in admin_ids:
-        reply("⚠️ Admin only."); return
-    reply("⏳ Starting all stopped scripts...")
+        reply("Admin only."); return
+    reply("Starting all stopped scripts...")
     started = 0; skipped = 0
     for tuid, files in dict(user_files).items():
         folder = get_user_folder(tuid)
@@ -1499,41 +1871,41 @@ def _logic_run_all_scripts(moc):
             fpath = os.path.join(folder, fname)
             if not os.path.exists(fpath): skipped += 1; continue
             try:
-                fn = run_script if ftype == 'py' else run_js_script
+                fn = run_script if ftype == 'py'else run_js_script
                 threading.Thread(target=fn, args=(fpath, tuid, folder, fname, msg_for_script)).start()
                 started += 1; time.sleep(0.5)
             except Exception as e:
                 logger.error(f"Run all error {fname}: {e}"); skipped += 1
-    reply(f"✅ Done! Started: `{started}` | Skipped: `{skipped}`", parse_mode='Markdown')
+    reply(f"Done! Started: `{started}` | Skipped: `{skipped}`", parse_mode='Markdown')
 
 def _logic_send_command(message):
     if bot_locked and message.from_user.id not in admin_ids:
-        bot.reply_to(message, "⚠️ Bot locked."); return
-    bot.reply_to(message, "📤 *Send Command*", reply_markup=create_send_command_menu(), parse_mode='Markdown')
+        bot.reply_to(message, "Bot locked."); return
+    bot.reply_to(message, " *Send Command*", reply_markup=create_send_command_menu(), parse_mode='Markdown')
 
 # ══════════════════════════════════════════════════════
 #  BROADCAST
 # ══════════════════════════════════════════════════════
 def process_broadcast_message(message):
     if message.from_user.id not in admin_ids:
-        bot.reply_to(message, "⚠️ Admin only."); return
+        bot.reply_to(message, "Admin only."); return
     if message.text and message.text.lower() == '/cancel':
         bot.reply_to(message, "Broadcast cancelled."); return
     markup = types.InlineKeyboardMarkup()
     markup.row(
-        types.InlineKeyboardButton("✅ Confirm", callback_data=f"confirm_broadcast_{message.message_id}"),
-        types.InlineKeyboardButton("❌ Cancel",  callback_data="cancel_broadcast")
+        premium_inline_button("Confirm", callback_data=f"confirm_broadcast_{message.message_id}"),
+        premium_inline_button("Cancel",  callback_data="cancel_broadcast")
     )
     preview = (message.text or "(media)")[:800]
     bot.reply_to(
         message,
-        f"📢 Broadcast to *{len(active_users)}* users?\n\n```\n{preview}\n```",
+        f"Broadcast to *{len(active_users)}* users?\n\n```\n{preview}\n```",
         reply_markup=markup, parse_mode='Markdown'
     )
 
 def handle_confirm_broadcast(call):
     if call.from_user.id not in admin_ids:
-        bot.answer_callback_query(call.id, "⚠️ Admin only.", show_alert=True); return
+        bot.answer_callback_query(call.id, "Admin only.", show_alert=True); return
     try:
         orig = call.message.reply_to_message
         if not orig: raise ValueError("Original not found.")
@@ -1542,15 +1914,15 @@ def handle_confirm_broadcast(call):
         elif orig.photo: photo = orig.photo[-1].file_id; caption = orig.caption
         elif orig.video: video = orig.video.file_id;     caption = orig.caption
         else: raise ValueError("Unsupported media.")
-        bot.answer_callback_query(call.id, "🚀 Broadcasting...")
-        bot.edit_message_text(f"📢 Broadcasting to {len(active_users)} users...",
+        bot.answer_callback_query(call.id, "Broadcasting...")
+        bot.edit_message_text(f"Broadcasting to {len(active_users)} users...",
                               call.message.chat.id, call.message.message_id)
         threading.Thread(
             target=execute_broadcast,
             args=(text, photo, video, caption, call.message.chat.id)
         ).start()
     except Exception as e:
-        bot.edit_message_text(f"❌ Error: {e}", call.message.chat.id, call.message.message_id)
+        bot.edit_message_text(f"Error: {e}", call.message.chat.id, call.message.message_id)
 
 def handle_cancel_broadcast(call):
     bot.answer_callback_query(call.id, "Broadcast cancelled.")
@@ -1563,14 +1935,14 @@ def execute_broadcast(text, photo, video, caption, admin_cid):
     for i, uid in enumerate(users):
         try:
             if text:  bot.send_message(uid, text, parse_mode='Markdown')
-            elif photo: bot.send_photo(uid, photo, caption=caption, parse_mode='Markdown' if caption else None)
-            elif video: bot.send_video(uid, video, caption=caption, parse_mode='Markdown' if caption else None)
+            elif photo: bot.send_photo(uid, photo, caption=caption, parse_mode='Markdown'if caption else None)
+            elif video: bot.send_video(uid, video, caption=caption, parse_mode='Markdown'if caption else None)
             sent += 1
         except telebot.apihelper.ApiTelegramException as e:
             s = str(e).lower()
             if any(x in s for x in ["blocked", "deactivated", "not found", "kicked"]):
                 blocked += 1
-            elif "flood" in s or "too many" in s:
+            elif "flood"in s or "too many"in s:
                 m = re.search(r"retry after (\d+)", s)
                 wait = int(m.group(1)) + 1 if m else 5
                 time.sleep(wait)
@@ -1585,9 +1957,9 @@ def execute_broadcast(text, photo, video, caption, admin_cid):
         if (i + 1) % 25 == 0: time.sleep(1.5)
         elif i % 5 == 0:      time.sleep(0.2)
     result = (
-        f"📢 *Broadcast Complete!*\n"
-        f"✅ Sent: `{sent}` | ❌ Failed: `{failed}` | 🚫 Blocked: `{blocked}`\n"
-        f"👥 Total: `{len(users)}`"
+        f" *Broadcast Complete!*\n"
+        f"Sent: `{sent}` |  Failed: `{failed}` |  Blocked: `{blocked}`\n"
+        f"Total: `{len(users)}`"
     )
     try: bot.send_message(admin_cid, result, parse_mode='Markdown')
     except Exception as e: logger.error(f"Broadcast result error: {e}")
@@ -1596,24 +1968,50 @@ def execute_broadcast(text, photo, video, caption, admin_cid):
 #  BUTTON TEXT MAP
 # ══════════════════════════════════════════════════════
 BUTTON_MAP = {
-    "📤 Upload File":    _logic_upload_file,
-    "📂 My Files":       _logic_check_files,
-    "⚡ Speed Test":     _logic_bot_speed,
-    "📊 Statistics":     _logic_statistics,
-    "💎 My Credits":     _logic_my_credits,
-    "🔗 Refer Friends":  _logic_refer,
-    "📤 Send Command":   _logic_send_command,
-    "📞 Contact Owner":  _logic_contact_owner,
-    "💳 Credits Panel":  _logic_credits_panel,
-    "📢 Broadcast":      _logic_broadcast_init,
-    "🔒 Lock Bot":       _logic_toggle_lock_bot,
-    "🟢 Run All Scripts":_logic_run_all_scripts,
-    "👑 Admin Panel":    _logic_admin_panel,
+    "Upload File":    _logic_upload_file,
+    "My Files":       _logic_check_files,
+    "Speed Test":     _logic_bot_speed,
+    "Statistics":     _logic_statistics,
+    "My Credits":     _logic_my_credits,
+    "Refer Friends":  _logic_refer,
+    "Send Command":   _logic_send_command,
+    "Contact Owner":  _logic_contact_owner,
+    "Credits Panel":  _logic_credits_panel,
+    "Broadcast":      _logic_broadcast_init,
+    "Lock Bot":       _logic_toggle_lock_bot,
+    "Run All Scripts":_logic_run_all_scripts,
+    "Admin Panel":    _logic_admin_panel,
 }
 
 # ══════════════════════════════════════════════════════
 #  COMMAND & TEXT HANDLERS
 # ══════════════════════════════════════════════════════
+@bot.message_handler(commands=['menu', 'panel'])
+def cmd_menu(message):
+    user_id = message.from_user.id
+    if bot_locked and user_id not in admin_ids:
+        bot.send_message(
+            message.chat.id,
+            f"{PE_STATUS} <b>EVIL CLOUD</b>\n\n"
+            f"{PE_OK} The bot is temporarily locked.\n"
+            f"{PE_OWNER} Please contact the owner.",
+            parse_mode='HTML'
+        )
+        return
+    bot.send_message(
+        message.chat.id,
+        f"{PE_STAR} <b>EVIL CLOUD CONTROL DECK</b> {PE_STAR3}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"{PE_OK} <b>HOST</b> • Upload & manage your bots\n"
+        f"{PE_STAR2} <b>MANAGE</b> • Files • Processes • Logs\n"
+        f"{PE_STATUS} <b>MONITOR</b> • Speed • Statistics\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"<i>Use the buttons below to control your hosting panel.</i>",
+        reply_markup=create_reply_keyboard(user_id),
+        parse_mode='HTML'
+    )
+    threading.Thread(target=auto_react, args=(message,)).start()
+
 @bot.message_handler(commands=['start', 'help'])
 def cmd_start(message):
     # Handle referral deep link: /start ref_USERID
@@ -1645,7 +2043,7 @@ def cmd_refer(message):
 def cmd_addcredits(message):
     """Admin: /addcredits USER_ID AMOUNT"""
     if message.from_user.id not in admin_ids:
-        bot.reply_to(message, "⚠️ Admin only."); return
+        bot.reply_to(message, "Admin only."); return
     parts = message.text.split()
     if len(parts) != 3:
         bot.reply_to(message, "Usage: `/addcredits USER_ID AMOUNT`", parse_mode='Markdown'); return
@@ -1654,17 +2052,17 @@ def cmd_addcredits(message):
         if amount <= 0: raise ValueError("Amount must be positive")
         add_credits(uid, amount, admin_id=message.from_user.id, action='admin_add')
         new_bal = get_credits(uid)
-        bot.reply_to(message, f"✅ Added `{amount}` credits to `{uid}`.\nNew balance: `{new_bal}`", parse_mode='Markdown')
+        bot.reply_to(message, f"Added `{amount}` credits to `{uid}`.\nNew balance: `{new_bal}`", parse_mode='Markdown')
         try:
             bot.send_message(uid,
-                f"🎉 *Credits Added!*\n\n"
-                f"✅ +`{amount}` credits from admin.\n"
-                f"💰 New balance: `{new_bal}`",
+                f" *Credits Added!*\n\n"
+                f" +`{amount}` credits from admin.\n"
+                f"New balance: `{new_bal}`",
                 parse_mode='Markdown'
             )
         except: pass
     except (ValueError, IndexError) as e:
-        bot.reply_to(message, f"⚠️ Error: {e}")
+        bot.reply_to(message, f"Error: {e}")
     threading.Thread(target=auto_react, args=(message,)).start()
 
 @bot.message_handler(commands=['status'])
@@ -1675,9 +2073,9 @@ def cmd_status(message):
 @bot.message_handler(commands=['ping'])
 def cmd_ping(message):
     t0  = time.time()
-    msg = bot.reply_to(message, "🏓 Pong!")
+    msg = bot.reply_to(message, "Pong!")
     lat = round((time.time() - t0) * 1000, 2)
-    bot.edit_message_text(f"🏓 Pong! `{lat} ms`", message.chat.id, msg.message_id, parse_mode='Markdown')
+    bot.edit_message_text(f"Pong! `{lat} ms`", message.chat.id, msg.message_id, parse_mode='Markdown')
     threading.Thread(target=auto_react, args=(message,)).start()
 
 @bot.message_handler(commands=['uploadfile'])
@@ -1731,102 +2129,216 @@ def handle_buttons(message):
     if fn: fn(message)
     threading.Thread(target=auto_react, args=(message,)).start()
 
+@bot.message_handler(content_types=['text'], func=lambda m: True)
+def _global_auto_reaction(message):
+    # Commands handled above may also reach this handler in telebot depending on
+    # registration order; reaction is intentionally harmless and non-blocking.
+    threading.Thread(target=auto_react, args=(message,), daemon=True).start()
+
+
+# ══════════════════════════════════════════════════════
+#  SECURITY REVIEW / ADMIN APPROVAL QUEUE
+# ══════════════════════════════════════════════════════
+PENDING_APPROVAL_DIR = os.path.join(DATA_DIR, 'pending_approvals')
+os.makedirs(PENDING_APPROVAL_DIR, exist_ok=True)
+
+def _pending_paths(request_id):
+    return (
+        os.path.join(PENDING_APPROVAL_DIR, f'{request_id}.bin'),
+        os.path.join(PENDING_APPROVAL_DIR, f'{request_id}.json')
+    )
+
+def queue_security_review(message, content, file_name, reason):
+    """Store a security-blocked upload without executing it and ask admins to review."""
+    request_id = uuid.uuid4().hex[:12]
+    bin_path, meta_path = _pending_paths(request_id)
+    try:
+        with open(bin_path, 'wb') as f:
+            f.write(content)
+        meta = {
+            'request_id': request_id,
+            'user_id': int(message.from_user.id),
+            'chat_id': int(message.chat.id),
+            'file_name': file_name,
+            'reason': str(reason),
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'status': 'pending'
+        }
+        with open(meta_path, 'w', encoding='utf-8') as f:
+            json.dump(meta, f, indent=2)
+    except Exception as e:
+        logger.error(f'Could not queue security review: {e}', exc_info=True)
+        return False
+
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.row(
+        premium_inline_button('APPROVE & HOST', callback_data=f'approve_pending_{request_id}'),
+        premium_inline_button('REJECT', callback_data=f'reject_pending_{request_id}')
+    )
+    body = (
+        f'{PE_DEV} <b>SECURITY REVIEW REQUIRED</b>\n\n'
+        f'{PE_VIEW} File : <code>{_html_escape(file_name)}</code>\n'
+        f'{PE_OWNER} User ID : <code>{message.from_user.id}</code>\n'
+        f'{PE_TIME} Reason : <code>{_html_escape(str(reason))}</code>\n'
+        f'{PE_STATUS} Request : <code>{request_id}</code>\n\n'
+        f'{PE_TIME} The file is quarantined and will <b>NOT</b> run unless an admin approves it.'
+    )
+    text, _ = premium_card('EVIL CLOUD SECURITY', body)
+    sent = 0
+    for admin_id in list(admin_ids):
+        try:
+            bot.send_message(admin_id, text, reply_markup=markup, parse_mode='HTML')
+            sent += 1
+        except Exception as e:
+            logger.error(f'Approval notification failed for {admin_id}: {e}')
+    return sent > 0
+
+def _load_pending(request_id):
+    bin_path, meta_path = _pending_paths(request_id)
+    if not os.path.exists(bin_path) or not os.path.exists(meta_path):
+        return None, None, None
+    try:
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            meta = json.load(f)
+        if meta.get('status') != 'pending':
+            return None, None, None
+        with open(bin_path, 'rb') as f:
+            content = f.read()
+        return meta, content, (bin_path, meta_path)
+    except Exception as e:
+        logger.error(f'Pending request read failed: {e}', exc_info=True)
+        return None, None, None
+
+def _finish_pending(request_id, status):
+    bin_path, meta_path = _pending_paths(request_id)
+    try:
+        if os.path.exists(meta_path):
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+            meta['status'] = status
+            meta['resolved_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            with open(meta_path, 'w', encoding='utf-8') as f:
+                json.dump(meta, f, indent=2)
+        if os.path.exists(bin_path):
+            os.remove(bin_path)
+        if os.path.exists(meta_path):
+            os.remove(meta_path)
+    except Exception as e:
+        logger.error(f'Pending cleanup failed: {e}', exc_info=True)
+
+def _approval_message(user_id, chat_id):
+    return SimpleNamespace(
+        chat=SimpleNamespace(id=chat_id),
+        from_user=SimpleNamespace(id=user_id)
+    )
+
+def approve_pending_callback(call):
+    if call.from_user.id not in admin_ids:
+        bot.answer_callback_query(call.id, 'Admin only.', show_alert=True); return
+    request_id = call.data[len('approve_pending_'):]
+    meta, content, paths = _load_pending(request_id)
+    if not meta:
+        bot.answer_callback_query(call.id, 'Request already resolved or expired.', show_alert=True); return
+    user_id = int(meta['user_id'])
+    fname = meta['file_name']
+    folder = get_user_folder(user_id)
+    dest = os.path.join(folder, fname)
+    try:
+        if not deduct_credit(user_id):
+            bot.answer_callback_query(call.id, 'User has no credits.', show_alert=True)
+            return
+        with open(dest, 'wb') as f:
+            f.write(content)
+        _finish_pending(request_id, 'approved')
+        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+        bot.send_message(call.message.chat.id,
+            f'{PE_OK} <b>APPROVED & HOSTED</b>\n\n{PE_VIEW} File : <code>{_html_escape(fname)}</code>\n{PE_OWNER} Approved by : <code>{call.from_user.id}</code>',
+            parse_mode='HTML')
+        try:
+            bot.send_message(user_id,
+                f'{PE_OK} <b>SECURITY REVIEW APPROVED</b>\n\n{PE_VIEW} Your file <code>{_html_escape(fname)}</code> was approved by the admin and is now being hosted.',
+                parse_mode='HTML')
+        except Exception: pass
+        msg = _approval_message(user_id, int(meta['chat_id']))
+        if fname.lower().endswith('.py'):
+            handle_py_file(dest, user_id, folder, fname, msg)
+        elif fname.lower().endswith('.js'):
+            handle_js_file(dest, user_id, folder, fname, msg)
+        elif fname.lower().endswith('.zip'):
+            handle_zip_file(content, fname, msg)
+        elif fname.lower() == 'requirements.txt':
+            install_requirements(folder, msg)
+    except Exception as e:
+        if os.path.exists(dest):
+            try: os.remove(dest)
+            except Exception: pass
+        try: add_credits(user_id, 1, action='approval_refund')
+        except Exception: pass
+        bot.send_message(call.message.chat.id, f'{PE_TIME} <b>Approval hosting failed:</b> <code>{_html_escape(str(e))}</code>', parse_mode='HTML')
+
+def reject_pending_callback(call):
+    if call.from_user.id not in admin_ids:
+        bot.answer_callback_query(call.id, 'Admin only.', show_alert=True); return
+    request_id = call.data[len('reject_pending_'):]
+    meta, content, paths = _load_pending(request_id)
+    if not meta:
+        bot.answer_callback_query(call.id, 'Request already resolved or expired.', show_alert=True); return
+    fname = meta['file_name']; user_id = int(meta['user_id'])
+    _finish_pending(request_id, 'rejected')
+    try:
+        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+    except Exception: pass
+    bot.answer_callback_query(call.id, 'Rejected.')
+    bot.send_message(call.message.chat.id,
+        f'{PE_TIME} <b>FILE REJECTED</b>\n\n{PE_VIEW} File : <code>{_html_escape(fname)}</code>\n{PE_OWNER} Rejected by : <code>{call.from_user.id}</code>',
+        parse_mode='HTML')
+    try:
+        bot.send_message(user_id,
+            f'{PE_TIME} <b>SECURITY REVIEW REJECTED</b>\n\n{PE_VIEW} Your file <code>{_html_escape(fname)}</code> was rejected by the admin and was not hosted.',
+            parse_mode='HTML')
+    except Exception: pass
+
 # ══════════════════════════════════════════════════════
 #  FILE UPLOAD HANDLER
 # ══════════════════════════════════════════════════════
 @bot.message_handler(content_types=['document'])
 def handle_document(message):
     user_id = message.from_user.id
-    threading.Thread(target=auto_react, args=(message,)).start()
-
+    threading.Thread(target=auto_react, args=(message,), daemon=True).start()
     if bot_locked and user_id not in admin_ids:
-        bot.reply_to(message, "⚠️ Bot locked."); return
-
-    # Credit check
+        bot.reply_to(message, "Bot locked."); return
     credits = get_credits(user_id)
     if credits != float('inf') and credits <= 0:
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton('🔗 Get Credits', callback_data='refer'))
-        markup.add(types.InlineKeyboardButton(f'💬 Contact Owner', url=f'https://t.me/{YOUR_USERNAME.lstrip("@")}'))
-        bot.reply_to(
-            message,
-            f"❌ *No credits!*\n\n"
-            f"Refer friends to earn credits or contact the owner.",
-            reply_markup=markup, parse_mode='Markdown'
-        )
-        return
-
+        markup.add(premium_inline_button('Get Credits', callback_data='refer'))
+        markup.add(premium_inline_button('Contact Owner', url=f'https://t.me/{YOUR_USERNAME.lstrip("@")}'))
+        bot.reply_to(message, "No credits! Refer friends or contact the owner.", reply_markup=markup); return
     doc = message.document
-    if not doc:
-        bot.reply_to(message, "❌ No document found."); return
-
-    fname_orig = doc.file_name or 'uploaded_file'
-    lower_name = fname_orig.lower()
-    allowed = lower_name.endswith(('.py', '.js', '.zip')) or lower_name == 'requirements.txt'
-    if not allowed:
-        bot.reply_to(
-            message,
-            f"❌ Only `.py`, `.js`, `.zip`, or `requirements.txt` allowed.\n"
-            f"Got: `{fname_orig}`",
-            parse_mode='Markdown'
-        )
-        return
-
+    if not doc: return
+    fname = doc.file_name or 'uploaded_file'
+    lower = fname.lower()
+    if not (lower.endswith(('.py','.js','.zip')) or lower == 'requirements.txt'):
+        bot.reply_to(message, f"Only .py, .js, .zip or requirements.txt allowed. Got: {fname}"); return
     if doc.file_size > 50 * 1024 * 1024:
-        bot.reply_to(message, "❌ File too large (>50 MB)."); return
-
+        bot.reply_to(message, "File too large (>50 MB)."); return
     try:
-        file_info = bot.get_file(doc.file_id)
-        content   = bot.download_file(file_info.file_path)
+        info = bot.get_file(doc.file_id)
+        content = bot.download_file(info.file_path)
     except Exception as e:
-        bot.reply_to(message, f"❌ Download failed: {e}"); return
+        bot.reply_to(message, f"Download failed: {e}"); return
 
-    user_folder = get_user_folder(user_id)
-    fname       = fname_orig
-
-    if fname.lower().endswith('.zip'):
-        # Deduct credit BEFORE processing
-        if not deduct_credit(user_id):
-            bot.reply_to(message, "❌ Failed to deduct credit."); return
-        new_bal = get_credits(user_id)
-        bal_str = "∞" if new_bal == float('inf') else str(new_bal)
-        bot.reply_to(message, f"📦 Processing ZIP... Credits remaining: `{bal_str}`", parse_mode='Markdown')
-        handle_zip_file(content, fname, message)
-        return
-
-    # Security scan
-    if user_id != OWNER_ID:
-        ok, reason = scan_file(content, fname, user_id)
-        if not ok:
-            bot.reply_to(message, f"🚨 Blocked: {reason}"); return
-
-    # Reserve/deduct credit before writing so a zero-credit user cannot leave an orphan file.
-    if not deduct_credit(user_id):
-        bot.reply_to(message, "❌ No credits left. Refer friends or contact the owner to get credits.")
-        return
-
-    # Save file. If storage fails, restore the consumed credit for normal users.
-    dest = os.path.join(user_folder, fname)
-    try:
-        with open(dest, 'wb') as f:
-            f.write(content)
-    except Exception as e:
-        if user_id != OWNER_ID and user_id not in admin_ids:
-            add_credits(user_id, 1, action='upload_refund')
-        bot.reply_to(message, f"❌ File save failed: {e}")
-        return
-    new_bal = get_credits(user_id)
-    bal_str = "∞" if new_bal == float('inf') else str(new_bal)
-    bot.reply_to(message, f"💾 File saved. Credits remaining: `{bal_str}`\n⚙️ Starting...", parse_mode='Markdown')
-
-    if fname.lower().endswith('.py'):
-        handle_py_file(dest, user_id, user_folder, fname, message)
-    elif fname.lower().endswith('.js'):
-        handle_js_file(dest, user_id, user_folder, fname, message)
-    elif fname.lower() == 'requirements.txt':
-        # Install immediately into the private writable package directory; do not execute the text file.
-        if install_requirements(user_folder, message):
-            bot.reply_to(message, "✅ `requirements.txt` saved and installed. Now upload/start your `.py` or `.js` bot.", parse_mode='Markdown')
+    # EVERY upload is quarantined first. Nothing is saved/executed until an admin approves it.
+    deploy_loading = premium_loading(message.chat.id, "SECURITY REVIEW")
+    ok, reason = scan_file(content, fname, user_id)
+    review_reason = "Automatic security scan passed; awaiting mandatory admin approval." if ok else reason
+    queued = queue_security_review(message, content, fname, review_reason)
+    premium_loading_done(message.chat.id, deploy_loading, "ADMIN REVIEW PENDING",
+        f"{PE_LOADING2} <b>Upload received and quarantined.</b>\n\n"
+        f"{PE_VIEW} File : <code>{_html_escape(fname)}</code>\n"
+        f"{PE_ADMIN} Status : <b>WAITING FOR ADMIN APPROVAL</b>\n"
+        f"{PE_SIGNAL} The file will not be hosted or executed before approval.")
+    if not queued:
+        bot.send_message(message.chat.id, f"{PE_TIME} Could not create the admin review request. Please contact the owner.", parse_mode='HTML')
 
 # ══════════════════════════════════════════════════════
 #  CALLBACK QUERY HANDLER
@@ -1837,10 +2349,13 @@ def callback_handler(call):
     data    = call.data
 
     if bot_locked and user_id not in admin_ids and data not in ['speed', 'stats', 'my_credits', 'refer', 'back_to_main']:
-        bot.answer_callback_query(call.id, "⚠️ Bot locked.", show_alert=True); return
+        bot.answer_callback_query(call.id, "Bot locked.", show_alert=True); return
 
     try:
-        if   data == 'upload':              upload_callback(call)
+        bot.answer_callback_query(call.id)
+        if   data.startswith('approve_pending_'): approve_pending_callback(call)
+        elif data.startswith('reject_pending_'): reject_pending_callback(call)
+        elif data == 'upload':              upload_callback(call)
         elif data == 'check_files':         check_files_callback(call)
         elif data.startswith('file_'):      file_control_callback(call)
         elif data.startswith('start_'):     start_bot_callback(call)
@@ -1868,6 +2383,8 @@ def callback_handler(call):
         elif data == 'unlock_bot':          _admin_cb(call, unlock_bot_callback)
         elif data == 'run_all_scripts':     _admin_cb(call, run_all_scripts_callback)
         elif data == 'admin_panel':         _admin_cb(call, admin_panel_callback)
+        elif data == 'gen_redeem':           _admin_cb(call, gen_redeem_callback)
+        elif data == 'user_see':             _admin_cb(call, user_see_callback)
         elif data == 'add_admin':           _owner_cb(call, add_admin_init_callback)
         elif data == 'remove_admin':        _owner_cb(call, remove_admin_init_callback)
         elif data == 'list_admins':         _admin_cb(call, list_admins_callback)
@@ -1876,18 +2393,18 @@ def callback_handler(call):
         else:
             bot.answer_callback_query(call.id, "Unknown action.")
     except Exception as e:
-        logger.error(f"Callback '{data}' for {user_id}: {e}", exc_info=True)
+        logger.error(f"Callback '{data}'for {user_id}: {e}", exc_info=True)
         try: bot.answer_callback_query(call.id, "Error.", show_alert=True)
         except: pass
 
 def _admin_cb(call, fn):
     if call.from_user.id not in admin_ids:
-        bot.answer_callback_query(call.id, "⚠️ Admin only.", show_alert=True); return
+        bot.answer_callback_query(call.id, "Admin only.", show_alert=True); return
     fn(call)
 
 def _owner_cb(call, fn):
     if call.from_user.id != OWNER_ID:
-        bot.answer_callback_query(call.id, "⚠️ Owner only.", show_alert=True); return
+        bot.answer_callback_query(call.id, "Owner only.", show_alert=True); return
     fn(call)
 
 # ══════════════════════════════════════════════════════
@@ -1897,38 +2414,42 @@ def upload_callback(call):
     user_id = call.from_user.id
     credits = get_credits(user_id)
     if credits != float('inf') and credits <= 0:
-        bot.answer_callback_query(call.id, "❌ No credits left! Refer friends or contact owner.", show_alert=True)
+        bot.answer_callback_query(call.id, "No credits left! Refer friends or contact owner.", show_alert=True)
         return
     bot.answer_callback_query(call.id)
-    credits_str = "∞" if credits == float('inf') else str(credits)
+    credits_str = "∞"if credits == float('inf') else str(credits)
     bot.send_message(
         call.message.chat.id,
-        f"📤 Send your `.py`, `.js`, `.zip`, or `requirements.txt` file.\n💎 Credits: `{credits_str}`",
+        f"Send your `.py`, `.js`, `.zip`, or `requirements.txt` file.\n Credits: `{credits_str}`",
         parse_mode='Markdown'
     )
 
 def check_files_callback(call):
     user_id = call.from_user.id
-    files   = user_files.get(user_id, [])
-    if not files:
-        bot.answer_callback_query(call.id, "⚠️ No files yet.", show_alert=True)
-        try:
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔙 Back", callback_data='back_to_main'))
-            bot.edit_message_text("📂 No files uploaded yet.",
-                call.message.chat.id, call.message.message_id, reply_markup=markup)
-        except: pass
-        return
+    files = sync_user_files(user_id)
     bot.answer_callback_query(call.id)
-    markup = types.InlineKeyboardMarkup(row_width=1)
-    for fn, ft in sorted(files):
-        icon = "🟢" if is_bot_running(user_id, fn) else "🔴"
-        markup.add(types.InlineKeyboardButton(f"{icon} {fn} [{ft}]", callback_data=f'file_{user_id}_{fn}'))
-    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data='back_to_main'))
+    if not files:
+        body = f"{PE_VIEW} <b>No hosted files found.</b>\n\n{PE_OK} Upload a <code>.py</code>, <code>.js</code> or <code>.zip</code> file to begin."
+        text, _ = premium_card("MY FILES", body, copy_value="EVIL CLOUD BOT")
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        try:
+            markup.add(types.InlineKeyboardButton("COPY CODE", icon_custom_emoji_id=PREMIUM_BUTTON_IDS["ok"], style="success", copy_text=types.CopyTextButton(text="EVIL CLOUD BOT")))
+        except Exception: pass
+        markup.add(premium_inline_button("BACK TO PANEL", callback_data='back_to_main'))
+    else:
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        for fn, ft in files:
+            running = is_bot_running(user_id, fn)
+            label = f"{fn}  •  {ft.upper()}  •  {'RUNNING' if running else 'STOPPED'}"
+            markup.add(premium_inline_button(label, callback_data=f'file_{user_id}_{fn}'))
+        try:
+            markup.add(types.InlineKeyboardButton("COPY CODE", icon_custom_emoji_id=PREMIUM_BUTTON_IDS["ok"], style="success", copy_text=types.CopyTextButton(text="EVIL CLOUD BOT")))
+        except Exception: pass
+        markup.add(premium_inline_button("BACK TO PANEL", callback_data='back_to_main'))
+        body = f"{PE_VIEW} <b>{len(files)} hosted file(s)</b>\n{PE_OK} Select a file to manage its process.\n{PE_TIME} Live status is checked when selected."
+        text, _ = premium_card("MY FILES", body, copy_value="EVIL CLOUD BOT")
     try:
-        bot.edit_message_text("📂 *Your Files:*",
-            call.message.chat.id, call.message.message_id,
-            reply_markup=markup, parse_mode='Markdown')
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode='HTML')
     except telebot.apihelper.ApiTelegramException as e:
         if "not modified" not in str(e): logger.error(f"check_files CB: {e}")
 
@@ -1937,21 +2458,24 @@ def file_control_callback(call):
         _, oid_str, fname = call.data.split('_', 2)
         oid = int(oid_str); uid = call.from_user.id
         if not (uid == oid or uid in admin_ids):
-            bot.answer_callback_query(call.id, "⚠️ Permission denied.", show_alert=True); return
-        files = user_files.get(oid, [])
-        if not any(f[0] == fname for f in files):
-            bot.answer_callback_query(call.id, "⚠️ File not found.", show_alert=True); return
+            bot.answer_callback_query(call.id, "Permission denied.", show_alert=True); return
+        files = sync_user_files(oid)
+        fi = next((f for f in files if f[0] == fname), None)
+        if not fi:
+            bot.answer_callback_query(call.id, "File not found.", show_alert=True); return
         bot.answer_callback_query(call.id)
         running = is_bot_running(oid, fname)
-        ft      = next((f[1] for f in files if f[0] == fname), '?')
-        status  = "🟢 Running" if running else "🔴 Stopped"
+        ft = fi[1]
+        status = f"{PE_OK} <b>RUNNING</b>" if running else f"{PE_TIME} <b>STOPPED</b>"
+        body = (
+            f"{PE_VIEW} <b>File</b> : <code>{_html_escape(fname)}</code>\n"
+            f"{PE_DEV} <b>Type</b> : <code>{_html_escape(ft.upper())}</code>\n"
+            f"{PE_OWNER} <b>Owner</b> : <code>{oid}</code>\n"
+            f"{PE_VIEW} <b>Status</b> : {status}"
+        )
+        text, _ = premium_card("FILE CONTROL", body, copy_value=fname, copy_label="COPY FILE NAME")
         try:
-            bot.edit_message_text(
-                f"⚙️ *{fname}* `[{ft}]`\nOwner: `{oid}` | Status: {status}",
-                call.message.chat.id, call.message.message_id,
-                reply_markup=create_control_buttons(oid, fname, running),
-                parse_mode='Markdown'
-            )
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=create_control_buttons(oid, fname, running), parse_mode='HTML')
         except telebot.apihelper.ApiTelegramException as e:
             if "not modified" not in str(e): raise
     except Exception as e:
@@ -1963,32 +2487,32 @@ def start_bot_callback(call):
         _, oid_str, fname = call.data.split('_', 2)
         oid = int(oid_str); uid = call.from_user.id
         if not (uid == oid or uid in admin_ids):
-            bot.answer_callback_query(call.id, "⚠️ Permission denied.", show_alert=True); return
+            bot.answer_callback_query(call.id, "Permission denied.", show_alert=True); return
         files = user_files.get(oid, [])
         fi = next((f for f in files if f[0] == fname), None)
         if not fi:
-            bot.answer_callback_query(call.id, "⚠️ File not found.", show_alert=True); return
+            bot.answer_callback_query(call.id, "File not found.", show_alert=True); return
         ft = fi[1]; folder = get_user_folder(oid); fpath = os.path.join(folder, fname)
         if not os.path.exists(fpath):
-            bot.answer_callback_query(call.id, "⚠️ File missing. Re-upload.", show_alert=True)
+            bot.answer_callback_query(call.id, "File missing. Re-upload.", show_alert=True)
             remove_user_file_db(oid, fname); return
         if is_bot_running(oid, fname):
-            bot.answer_callback_query(call.id, "⚠️ Already running.", show_alert=True); return
-        bot.answer_callback_query(call.id, f"▶️ Starting {fname}...")
-        fn = run_script if ft == 'py' else run_js_script
+            bot.answer_callback_query(call.id, "Already running.", show_alert=True); return
+        bot.answer_callback_query(call.id, f"▶ Starting {fname}...")
+        fn = run_script if ft == 'py'else run_js_script
         threading.Thread(target=fn, args=(fpath, oid, folder, fname, call.message)).start()
         time.sleep(3.5)
         running = is_bot_running(oid, fname)
-        status  = "🟢 Running" if running else "🟡 Starting..."
+        status  = "Running"if running else "Starting..."
         try:
             bot.edit_message_text(
-                f"⚙️ *{fname}* `[{ft}]`\nStatus: {status}",
+                f" *{fname}* `[{ft}]`\nStatus: {status}",
                 call.message.chat.id, call.message.message_id,
                 reply_markup=create_control_buttons(oid, fname, running),
                 parse_mode='Markdown'
             )
         except telebot.apihelper.ApiTelegramException as e:
-            if "not modified" not in str(e): raise
+            if "not modified"not in str(e): raise
     except Exception as e:
         logger.error(f"start_bot CB: {e}")
         bot.answer_callback_query(call.id, "Error starting.", show_alert=True)
@@ -1998,27 +2522,27 @@ def stop_bot_callback(call):
         _, oid_str, fname = call.data.split('_', 2)
         oid = int(oid_str); uid = call.from_user.id
         if not (uid == oid or uid in admin_ids):
-            bot.answer_callback_query(call.id, "⚠️ Permission denied.", show_alert=True); return
+            bot.answer_callback_query(call.id, "Permission denied.", show_alert=True); return
         files = user_files.get(oid, [])
         fi = next((f for f in files if f[0] == fname), None)
         if not fi:
-            bot.answer_callback_query(call.id, "⚠️ File not found.", show_alert=True); return
+            bot.answer_callback_query(call.id, "File not found.", show_alert=True); return
         ft = fi[1]; key = f"{oid}_{fname}"
         if not is_bot_running(oid, fname):
-            bot.answer_callback_query(call.id, "⚠️ Not running.", show_alert=True); return
-        bot.answer_callback_query(call.id, f"⏹️ Stopping {fname}...")
+            bot.answer_callback_query(call.id, "Not running.", show_alert=True); return
+        bot.answer_callback_query(call.id, f"Stopping {fname}...")
         info = bot_scripts.get(key)
         if info: kill_process_tree(info)
         bot_scripts.pop(key, None)
         try:
             bot.edit_message_text(
-                f"⚙️ *{fname}* `[{ft}]`\nStatus: 🔴 Stopped",
+                f" *{fname}* `[{ft}]`\nStatus:  Stopped",
                 call.message.chat.id, call.message.message_id,
                 reply_markup=create_control_buttons(oid, fname, False),
                 parse_mode='Markdown'
             )
         except telebot.apihelper.ApiTelegramException as e:
-            if "not modified" not in str(e): raise
+            if "not modified"not in str(e): raise
     except Exception as e:
         logger.error(f"stop_bot CB: {e}")
         bot.answer_callback_query(call.id, "Error stopping.", show_alert=True)
@@ -2028,36 +2552,36 @@ def restart_bot_callback(call):
         _, oid_str, fname = call.data.split('_', 2)
         oid = int(oid_str); uid = call.from_user.id
         if not (uid == oid or uid in admin_ids):
-            bot.answer_callback_query(call.id, "⚠️ Permission denied.", show_alert=True); return
+            bot.answer_callback_query(call.id, "Permission denied.", show_alert=True); return
         files = user_files.get(oid, [])
         fi = next((f for f in files if f[0] == fname), None)
         if not fi:
-            bot.answer_callback_query(call.id, "⚠️ File not found.", show_alert=True); return
+            bot.answer_callback_query(call.id, "File not found.", show_alert=True); return
         ft = fi[1]; folder = get_user_folder(oid); fpath = os.path.join(folder, fname)
         if not os.path.exists(fpath):
-            bot.answer_callback_query(call.id, "⚠️ File missing. Re-upload.", show_alert=True)
+            bot.answer_callback_query(call.id, "File missing. Re-upload.", show_alert=True)
             remove_user_file_db(oid, fname); return
-        bot.answer_callback_query(call.id, f"🔄 Restarting {fname}...")
+        bot.answer_callback_query(call.id, f"Restarting {fname}...")
         key = f"{oid}_{fname}"
         if is_bot_running(oid, fname):
             info = bot_scripts.get(key)
             if info: kill_process_tree(info)
             bot_scripts.pop(key, None)
             time.sleep(1.5)
-        fn = run_script if ft == 'py' else run_js_script
+        fn = run_script if ft == 'py'else run_js_script
         threading.Thread(target=fn, args=(fpath, oid, folder, fname, call.message)).start()
         time.sleep(3.5)
         running = is_bot_running(oid, fname)
-        status  = "🟢 Running" if running else "🟡 Starting..."
+        status  = "Running"if running else "Starting..."
         try:
             bot.edit_message_text(
-                f"⚙️ *{fname}* `[{ft}]`\nStatus: {status}",
+                f" *{fname}* `[{ft}]`\nStatus: {status}",
                 call.message.chat.id, call.message.message_id,
                 reply_markup=create_control_buttons(oid, fname, running),
                 parse_mode='Markdown'
             )
         except telebot.apihelper.ApiTelegramException as e:
-            if "not modified" not in str(e): raise
+            if "not modified"not in str(e): raise
     except Exception as e:
         logger.error(f"restart CB: {e}")
         bot.answer_callback_query(call.id, "Error restarting.", show_alert=True)
@@ -2067,10 +2591,10 @@ def delete_bot_callback(call):
         _, oid_str, fname = call.data.split('_', 2)
         oid = int(oid_str); uid = call.from_user.id
         if not (uid == oid or uid in admin_ids):
-            bot.answer_callback_query(call.id, "⚠️ Permission denied.", show_alert=True); return
+            bot.answer_callback_query(call.id, "Permission denied.", show_alert=True); return
         if not any(f[0] == fname for f in user_files.get(oid, [])):
-            bot.answer_callback_query(call.id, "⚠️ File not found.", show_alert=True); return
-        bot.answer_callback_query(call.id, f"🗑️ Deleting {fname}...")
+            bot.answer_callback_query(call.id, "File not found.", show_alert=True); return
+        bot.answer_callback_query(call.id, f"Deleting {fname}...")
         key = f"{oid}_{fname}"
         if is_bot_running(oid, fname):
             info = bot_scripts.get(key)
@@ -2087,7 +2611,7 @@ def delete_bot_callback(call):
         remove_user_file_db(oid, fname)
         try:
             bot.edit_message_text(
-                f"🗑️ `{fname}` deleted.",
+                f" `{fname}` deleted.",
                 call.message.chat.id, call.message.message_id,
                 parse_mode='Markdown'
             )
@@ -2101,12 +2625,12 @@ def logs_bot_callback(call):
         _, oid_str, fname = call.data.split('_', 2)
         oid = int(oid_str); uid = call.from_user.id
         if not (uid == oid or uid in admin_ids):
-            bot.answer_callback_query(call.id, "⚠️ Permission denied.", show_alert=True); return
+            bot.answer_callback_query(call.id, "Permission denied.", show_alert=True); return
         if not any(f[0] == fname for f in user_files.get(oid, [])):
-            bot.answer_callback_query(call.id, "⚠️ File not found.", show_alert=True); return
+            bot.answer_callback_query(call.id, "File not found.", show_alert=True); return
         log_path = os.path.join(get_user_folder(oid), f"{os.path.splitext(fname)[0]}.log")
         if not os.path.exists(log_path):
-            bot.answer_callback_query(call.id, "⚠️ No logs yet.", show_alert=True); return
+            bot.answer_callback_query(call.id, "No logs yet.", show_alert=True); return
         bot.answer_callback_query(call.id)
         size = os.path.getsize(log_path)
         if size == 0:
@@ -2122,7 +2646,7 @@ def logs_bot_callback(call):
         if not content.strip(): content = "(Empty)"
         bot.send_message(
             call.message.chat.id,
-            f"📜 *Logs — `{fname}`*:\n```\n{content}\n```",
+            f" *Logs — `{fname}`*:\n```\n{content}\n```",
             parse_mode='Markdown'
         )
     except Exception as e:
@@ -2131,24 +2655,20 @@ def logs_bot_callback(call):
 
 def speed_callback(call):
     uid = call.from_user.id; cid = call.message.chat.id
-    t0  = time.time()
+    t0 = time.time()
     try:
-        bot.edit_message_text("⏱️ Testing...", cid, call.message.message_id)
-        ms  = round((time.time() - t0) * 1000, 2)
+        ms = round((time.time() - t0) * 1000, 2)
         lvl = get_user_status_str(uid)
-        text = (
-            f"⚡ *Speed Report*\n"
-            f"━━━━━━━━━━━━━━━\n"
-            f"📶 Ping: `{ms} ms`\n"
-            f"🚦 Bot: {'🔒 Locked' if bot_locked else '🟢 Online'}\n"
-            f"👤 You: {lvl}\n"
-            f"━━━━━━━━━━━━━━━"
+        body = (
+            f"{PE_OK} <b>Ping</b> : <code>{ms} ms</code>\n"
+            f"{PE_VIEW} <b>Bot</b> : <code>{'LOCKED' if bot_locked else 'ONLINE'}</code>\n"
+            f"{PE_OWNER} <b>You</b> : {lvl}"
         )
+        text, _ = premium_card("SPEED REPORT", body, copy_value=f"Ping: {ms} ms", copy_label="COPY REPORT")
         bot.answer_callback_query(call.id)
-        bot.edit_message_text(text, cid, call.message.message_id,
-                              reply_markup=create_main_menu_inline(uid), parse_mode='Markdown')
+        bot.edit_message_text(text, cid, call.message.message_id, reply_markup=create_main_menu_inline(uid), parse_mode='HTML')
     except Exception as e:
-        bot.answer_callback_query(call.id, "Error.", show_alert=True)
+        bot.answer_callback_query(call.id, "Speed test error.", show_alert=True)
 
 def stats_callback(call):
     bot.answer_callback_query(call.id)
@@ -2167,39 +2687,46 @@ def back_to_main_callback(call):
     credits = get_credits(uid)
     credits_str = "∞" if credits == float('inf') else str(credits)
     status = get_user_status_str(uid)
-    files  = get_user_file_count(uid)
-    text   = (
-        f"⚡ *{BOT_NAME}*\n"
-        f"━━━━━━━━━━━━━━━\n"
-        f"👋 {call.from_user.first_name}\n"
-        f"🆔 `{uid}` | 🔰 {status}\n"
-        f"💎 Credits: `{credits_str}`\n"
-        f"📁 Files: `{files}`\n"
-        f"━━━━━━━━━━━━━━━"
+    files = get_user_file_count(uid)
+    body = (
+        f"{PE_OK} <b>Welcome back, {_html_escape(call.from_user.first_name or 'User').upper()}.</b>\n\n"
+        f"{PE_VIEW} Status : {status}\n"
+        f"{PE_DEV} Credits : <code>{credits_str}</code>\n"
+        f"{PE_TIME} Hosted : <code>{files}</code>\n\n"
+        f"{PE_OWNER} Select an action from your EVIL CLOUD control deck."
     )
+    text, _ = premium_card("EVIL CLOUD CONTROL DECK", body)
     try:
         bot.answer_callback_query(call.id)
-        bot.edit_message_text(text, call.message.chat.id, call.message.message_id,
-                              reply_markup=create_main_menu_inline(uid), parse_mode='Markdown')
+        # A callback may originate from the welcome VIDEO. Telegram cannot edit
+        # a video message's text, so send a fresh premium control card instead.
+        if getattr(call.message, 'content_type', '') == 'video':
+            bot.send_message(call.message.chat.id, text, reply_markup=create_main_menu_inline(uid), parse_mode='HTML')
+        else:
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id,
+                                  reply_markup=create_main_menu_inline(uid), parse_mode='HTML')
     except telebot.apihelper.ApiTelegramException as e:
-        if "not modified" not in str(e): logger.error(f"back_to_main: {e}")
+        if 'there is no text in the message to edit' in str(e).lower():
+            bot.send_message(call.message.chat.id, text, reply_markup=create_main_menu_inline(uid), parse_mode='HTML')
+        elif 'not modified' not in str(e).lower():
+            logger.error(f'back_to_main: {e}')
 
 def send_command_callback(call):
     bot.answer_callback_query(call.id)
     try:
-        bot.edit_message_text("📤 *Send Command*", call.message.chat.id, call.message.message_id,
+        bot.edit_message_text(" *Send Command*", call.message.chat.id, call.message.message_id,
                               reply_markup=create_send_command_menu(), parse_mode='Markdown')
     except Exception as e: logger.error(f"send_command CB: {e}")
 
 def send_to_process_callback(call):
     bot.answer_callback_query(call.id)
-    msg = bot.send_message(call.message.chat.id, "📝 Type your command:")
+    msg = bot.send_message(call.message.chat.id, "Type your command:")
     bot.register_next_step_handler(msg, send_to_process_init)
 
 def sendcmd_select_callback(call):
     key = call.data.replace('sendcmd_select_', '')
     bot.answer_callback_query(call.id)
-    msg = bot.send_message(call.message.chat.id, f"📝 Command for `{key}`:", parse_mode='Markdown')
+    msg = bot.send_message(call.message.chat.id, f"Command for `{key}`:", parse_mode='Markdown')
     bot.register_next_step_handler(msg, lambda m: process_send_command(m, key))
 
 def view_all_logs_callback(call):
@@ -2211,11 +2738,11 @@ def viewlog_callback(call):
         _, uid_str, lf = call.data.split('_', 2)
         uid = int(uid_str); req = call.from_user.id
         if not (req == uid or req in admin_ids):
-            bot.answer_callback_query(call.id, "⚠️ Permission denied.", show_alert=True); return
+            bot.answer_callback_query(call.id, "Permission denied.", show_alert=True); return
         lpath = os.path.join(get_user_folder(uid), lf)
         if not os.path.exists(lpath):
-            bot.answer_callback_query(call.id, "❌ Log not found.", show_alert=True); return
-        bot.answer_callback_query(call.id, "📜 Sending...")
+            bot.answer_callback_query(call.id, "Log not found.", show_alert=True); return
+        bot.answer_callback_query(call.id, "Sending...")
         send_log_file(call.message, lpath, lf)
     except Exception as e:
         logger.error(f"viewlog CB: {e}")
@@ -2225,7 +2752,7 @@ def viewlog_callback(call):
 def credits_panel_callback(call):
     bot.answer_callback_query(call.id)
     try:
-        bot.edit_message_text("💳 *Credits Manager*",
+        bot.edit_message_text(" *Credits Manager*",
             call.message.chat.id, call.message.message_id,
             reply_markup=create_credits_panel(), parse_mode='Markdown')
     except Exception as e: logger.error(f"credits panel CB: {e}")
@@ -2233,11 +2760,11 @@ def credits_panel_callback(call):
 def add_credits_init_callback(call):
     bot.answer_callback_query(call.id)
     msg = bot.send_message(call.message.chat.id,
-        "💳 Enter: `USER_ID AMOUNT`\n/cancel to abort.", parse_mode='Markdown')
+        "Enter: `USER_ID AMOUNT`\n/cancel to abort.", parse_mode='Markdown')
     bot.register_next_step_handler(msg, process_add_credits)
 
 def process_add_credits(message):
-    if message.from_user.id not in admin_ids: bot.reply_to(message, "⚠️ Admin only."); return
+    if message.from_user.id not in admin_ids: bot.reply_to(message, "Admin only."); return
     if message.text.lower() == '/cancel': bot.reply_to(message, "Cancelled."); return
     try:
         parts = message.text.split()
@@ -2246,24 +2773,24 @@ def process_add_credits(message):
         if amount <= 0: raise ValueError("Amount must be positive")
         add_credits(uid, amount, admin_id=message.from_user.id, action='admin_add')
         new_bal = get_credits(uid)
-        bot.reply_to(message, f"✅ Added `{amount}` credits to `{uid}`.\nBalance: `{new_bal}`", parse_mode='Markdown')
+        bot.reply_to(message, f"Added `{amount}` credits to `{uid}`.\nBalance: `{new_bal}`", parse_mode='Markdown')
         try:
             bot.send_message(uid,
-                f"🎉 *Credits Added!*\n+`{amount}` credits by admin.\n💰 Balance: `{new_bal}`",
+                f" *Credits Added!*\n+`{amount}` credits by admin.\n Balance: `{new_bal}`",
                 parse_mode='Markdown')
         except: pass
     except ValueError as e:
-        msg = bot.reply_to(message, f"⚠️ {e}. Try again or /cancel.")
+        msg = bot.reply_to(message, f" {e}. Try again or /cancel.")
         bot.register_next_step_handler(msg, process_add_credits)
 
 def remove_credits_init_callback(call):
     bot.answer_callback_query(call.id)
     msg = bot.send_message(call.message.chat.id,
-        "💳 Enter: `USER_ID AMOUNT`\n/cancel to abort.", parse_mode='Markdown')
+        "Enter: `USER_ID AMOUNT`\n/cancel to abort.", parse_mode='Markdown')
     bot.register_next_step_handler(msg, process_remove_credits)
 
 def process_remove_credits(message):
-    if message.from_user.id not in admin_ids: bot.reply_to(message, "⚠️ Admin only."); return
+    if message.from_user.id not in admin_ids: bot.reply_to(message, "Admin only."); return
     if message.text.lower() == '/cancel': bot.reply_to(message, "Cancelled."); return
     try:
         parts = message.text.split()
@@ -2275,32 +2802,32 @@ def process_remove_credits(message):
             raise ValueError("Cannot remove credits from an Admin/Owner")
         _set_credits_db(uid, new_bal)
         _record_credit_transaction(uid, message.from_user.id, 'admin_remove', amount, new_bal)
-        bot.reply_to(message, f"✅ Removed `{amount}` from `{uid}`. New balance: `{new_bal}`", parse_mode='Markdown')
+        bot.reply_to(message, f"Removed `{amount}` from `{uid}`. New balance: `{new_bal}`", parse_mode='Markdown')
     except ValueError as e:
-        msg = bot.reply_to(message, f"⚠️ {e}. Try again or /cancel.")
+        msg = bot.reply_to(message, f" {e}. Try again or /cancel.")
         bot.register_next_step_handler(msg, process_remove_credits)
 
 def check_credits_init_callback(call):
     bot.answer_callback_query(call.id)
     msg = bot.send_message(call.message.chat.id,
-        "💳 Enter User ID to check. /cancel to abort.")
+        "Enter User ID to check. /cancel to abort.")
     bot.register_next_step_handler(msg, process_check_credits)
 
 def process_check_credits(message):
-    if message.from_user.id not in admin_ids: bot.reply_to(message, "⚠️ Admin only."); return
+    if message.from_user.id not in admin_ids: bot.reply_to(message, "Admin only."); return
     if message.text.lower() == '/cancel': bot.reply_to(message, "Cancelled."); return
     try:
         uid = int(message.text.strip())
         credits = get_credits(uid)
-        credits_str = "∞ (Admin/Owner)" if credits == float('inf') else str(credits)
+        credits_str = "∞ (Admin/Owner)"if credits == float('inf') else str(credits)
         status  = get_user_status_str(uid)
         bot.reply_to(message,
-            f"💎 Credits for `{uid}`:\n"
+            f"Credits for `{uid}`:\n"
             f"Balance: `{credits_str}`\n"
             f"Status: {status}",
             parse_mode='Markdown')
     except ValueError:
-        msg = bot.reply_to(message, "⚠️ Invalid ID. /cancel to abort.")
+        msg = bot.reply_to(message, "Invalid ID. /cancel to abort.")
         bot.register_next_step_handler(msg, process_check_credits)
 
 def credit_history_callback(call):
@@ -2313,14 +2840,14 @@ def credit_history_callback(call):
         ).fetchall()
         conn.close()
         if not rows:
-            text = "📜 *Credit History*\n\nNo transactions yet."
+            text = " *Credit History*\n\nNo transactions yet."
         else:
-            lines = ["📜 *Credit History*", ""]
+            lines = [" *Credit History*", ""]
             for uid, aid, action, amount, balance, created in rows:
-                bal = "∞" if balance is None else str(balance)
-                who = "System" if aid is None else str(aid)
+                bal = "∞"if balance is None else str(balance)
+                who = "System"if aid is None else str(aid)
                 lines.append(f"• `{uid}` — *{action}* `{amount}` | Bal: `{bal}` | By: `{who}`")
-                lines.append(f"  🕐 {created}")
+                lines.append(f"   {created}")
             text = "\n".join(lines)
         bot.edit_message_text(text, call.message.chat.id, call.message.message_id,
                               reply_markup=create_credits_panel(), parse_mode='Markdown')
@@ -2332,14 +2859,14 @@ def credit_history_callback(call):
 # Lock / Unlock / Broadcast / Admin panel callbacks
 def lock_bot_callback(call):
     global bot_locked; bot_locked = True
-    bot.answer_callback_query(call.id, "🔒 Bot locked.")
+    bot.answer_callback_query(call.id, "Bot locked.")
     try: bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id,
                                        reply_markup=create_main_menu_inline(call.from_user.id))
     except: pass
 
 def unlock_bot_callback(call):
     global bot_locked; bot_locked = False
-    bot.answer_callback_query(call.id, "🟢 Bot unlocked.")
+    bot.answer_callback_query(call.id, "Bot unlocked.")
     try: bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id,
                                        reply_markup=create_main_menu_inline(call.from_user.id))
     except: pass
@@ -2348,69 +2875,172 @@ def run_all_scripts_callback(call): _logic_run_all_scripts(call)
 
 def broadcast_init_callback(call):
     bot.answer_callback_query(call.id)
-    msg = bot.send_message(call.message.chat.id, "📢 Send broadcast message. /cancel to abort.")
+    msg = bot.send_message(call.message.chat.id, "Send broadcast message. /cancel to abort.")
     bot.register_next_step_handler(msg, process_broadcast_message)
 
 def admin_panel_callback(call):
     bot.answer_callback_query(call.id)
+    body = f"{PE_OWNER} <b>Administrator control center</b>\n\n{PE_OK} Manage admins, credits and bot operations."
+    text, _ = premium_card("ADMIN CONTROL PANEL", body)
     try:
-        bot.edit_message_text("👑 *Admin Panel*", call.message.chat.id, call.message.message_id,
-                              reply_markup=create_admin_panel(), parse_mode='Markdown')
-    except Exception as e: logger.error(f"admin panel CB: {e}")
+        if getattr(call.message, 'content_type', '') == 'video':
+            bot.send_message(call.message.chat.id, text, reply_markup=create_admin_panel(), parse_mode='HTML')
+        else:
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id,
+                                  reply_markup=create_admin_panel(), parse_mode='HTML')
+    except Exception as e:
+        if 'there is no text in the message to edit' in str(e).lower():
+            bot.send_message(call.message.chat.id, text, reply_markup=create_admin_panel(), parse_mode='HTML')
+        else:
+            logger.error(f"admin panel CB: {e}")
 
 def add_admin_init_callback(call):
     bot.answer_callback_query(call.id)
     msg = bot.send_message(call.message.chat.id,
-        "👑 Enter Telegram User ID to promote.\n/cancel to abort.")
+        "Enter Telegram User ID to promote.\n/cancel to abort.")
     bot.register_next_step_handler(msg, process_add_admin_id)
 
 def process_add_admin_id(message):
-    if message.from_user.id != OWNER_ID: bot.reply_to(message, "⚠️ Owner only."); return
+    if message.from_user.id != OWNER_ID: bot.reply_to(message, "Owner only."); return
     if message.text.lower() == '/cancel': bot.reply_to(message, "Cancelled."); return
     try:
         nid = int(message.text.strip())
-        if nid == OWNER_ID: bot.reply_to(message, "⚠️ Already owner."); return
-        if nid in admin_ids: bot.reply_to(message, f"⚠️ `{nid}` already admin.", parse_mode='Markdown'); return
+        if nid == OWNER_ID: bot.reply_to(message, "Already owner."); return
+        if nid in admin_ids: bot.reply_to(message, f" `{nid}` already admin.", parse_mode='Markdown'); return
         add_admin_db(nid)
-        bot.reply_to(message, f"✅ `{nid}` promoted to Admin.", parse_mode='Markdown')
-        try: bot.send_message(nid, "🎉 You are now an Admin of JexxyCloudBot!")
+        bot.reply_to(message, f" `{nid}` promoted to Admin.", parse_mode='Markdown')
+        try: bot.send_message(nid, "You are now an Admin of EVILCloudBot!")
         except: pass
     except ValueError:
-        msg = bot.reply_to(message, "⚠️ Invalid ID. Try again or /cancel.")
+        msg = bot.reply_to(message, "Invalid ID. Try again or /cancel.")
         bot.register_next_step_handler(msg, process_add_admin_id)
 
 def remove_admin_init_callback(call):
     bot.answer_callback_query(call.id)
-    msg = bot.send_message(call.message.chat.id, "👑 Enter Admin ID to demote. /cancel to abort.")
+    msg = bot.send_message(call.message.chat.id, "Enter Admin ID to demote. /cancel to abort.")
     bot.register_next_step_handler(msg, process_remove_admin_id)
 
 def process_remove_admin_id(message):
-    if message.from_user.id != OWNER_ID: bot.reply_to(message, "⚠️ Owner only."); return
+    if message.from_user.id != OWNER_ID: bot.reply_to(message, "Owner only."); return
     if message.text.lower() == '/cancel': bot.reply_to(message, "Cancelled."); return
     try:
         rid = int(message.text.strip())
-        if rid == OWNER_ID: bot.reply_to(message, "⚠️ Cannot demote owner."); return
-        if rid not in admin_ids: bot.reply_to(message, f"⚠️ `{rid}` not admin.", parse_mode='Markdown'); return
+        if rid == OWNER_ID: bot.reply_to(message, "Cannot demote owner."); return
+        if rid not in admin_ids: bot.reply_to(message, f" `{rid}` not admin.", parse_mode='Markdown'); return
         if remove_admin_db(rid):
-            bot.reply_to(message, f"✅ Admin `{rid}` removed.", parse_mode='Markdown')
-            try: bot.send_message(rid, "ℹ️ Admin access revoked.")
+            bot.reply_to(message, f"Admin `{rid}` removed.", parse_mode='Markdown')
+            try: bot.send_message(rid, "ℹ Admin access revoked.")
             except: pass
         else:
-            bot.reply_to(message, f"❌ Failed to remove `{rid}`.", parse_mode='Markdown')
+            bot.reply_to(message, f"Failed to remove `{rid}`.", parse_mode='Markdown')
     except ValueError:
-        msg = bot.reply_to(message, "⚠️ Invalid ID. /cancel to abort.")
+        msg = bot.reply_to(message, "Invalid ID. /cancel to abort.")
         bot.register_next_step_handler(msg, process_remove_admin_id)
 
 def list_admins_callback(call):
     bot.answer_callback_query(call.id)
-    lines = "\n".join(f"• `{a}` {'👑 Owner' if a == OWNER_ID else '🛡️ Admin'}" for a in sorted(admin_ids))
+    lines = "\n".join(f"• `{a}` {'Owner'if a == OWNER_ID else 'Admin'}"for a in sorted(admin_ids))
     try:
         bot.edit_message_text(
-            f"👑 *Admin List:*\n\n{lines or '(none)'}",
+            f" *Admin List:*\n\n{lines or '(none)'}",
             call.message.chat.id, call.message.message_id,
             reply_markup=create_admin_panel(), parse_mode='Markdown'
         )
     except Exception as e: logger.error(f"list_admins CB: {e}")
+
+def gen_redeem_callback(call):
+    if call.from_user.id not in admin_ids: return
+    code = "JX-" + uuid.uuid4().hex[:10].upper()
+    amount = 1
+    conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
+    try:
+        conn.execute("CREATE TABLE IF NOT EXISTS redeem_codes (code TEXT PRIMARY KEY, amount INTEGER NOT NULL, used_by INTEGER, created_at TEXT NOT NULL)")
+        conn.execute("INSERT INTO redeem_codes(code,amount,used_by,created_at) VALUES (?,?,NULL,?)", (code, amount, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        conn.commit()
+    finally: conn.close()
+    bot.send_message(call.message.chat.id, f"{PE_REDEEM} <b>REDEEM GENERATED</b>\n\n<code>{code}</code>\n{PE_CREDITS} Credits: <b>{amount}</b>", parse_mode='HTML')
+
+def user_see_callback(call):
+    if call.from_user.id not in admin_ids: return
+    rows = sorted(active_users)
+    preview = rows[-50:]
+    body = f"{PE_USER_SEE} <b>Total Users:</b> <code>{len(rows)}</code>\n\n" + "\n".join(f"• <code>{uid}</code>" for uid in preview)
+    bot.send_message(call.message.chat.id, f"{PE_ADMIN} <b>USER LIST</b>\n\n{body}", parse_mode='HTML')
+
+@bot.message_handler(func=lambda message: bool(message.text) and message.text in {
+    "📤 HOST FILE", "📁 MY FILES", "🚀 SPEED TEST", "📊 STATISTICS",
+    "💎 MY CREDITS", "🎁 REFER FRIENDS", "📨 SEND COMMAND", "👤 CONTACT OWNER",
+    "💳 CREDITS PANEL", "📢 BROADCAST", "🔒 LOCK BOT", "🔓 UNLOCK BOT",
+    "▶️ RUN ALL", "🛡️ ADMIN PANEL",
+})
+def reply_keyboard_router(message):
+    """Route native reply-keyboard buttons to the existing bot logic."""
+    action = message.text
+    actions = {
+        "📤 HOST FILE": _logic_upload_file,
+        "📁 MY FILES": _logic_check_files,
+        "🚀 SPEED TEST": _logic_bot_speed,
+        "📊 STATISTICS": _logic_statistics,
+        "💎 MY CREDITS": _logic_my_credits,
+        "🎁 REFER FRIENDS": _logic_refer,
+        "📨 SEND COMMAND": _logic_send_command,
+        "👤 CONTACT OWNER": _logic_contact_owner,
+        "💳 CREDITS PANEL": _logic_credits_panel,
+        "📢 BROADCAST": _logic_broadcast_init,
+        "🔒 LOCK BOT": _logic_toggle_lock_bot,
+        "🔓 UNLOCK BOT": _logic_toggle_lock_bot,
+        "▶️ RUN ALL": _logic_run_all_scripts,
+        "🛡️ ADMIN PANEL": _logic_admin_panel,
+    }
+    fn = actions.get(action)
+    if not fn:
+        return
+    if action in {"💳 CREDITS PANEL", "📢 BROADCAST", "🔒 LOCK BOT", "🔓 UNLOCK BOT", "▶️ RUN ALL", "🛡️ ADMIN PANEL"} and message.from_user.id not in admin_ids:
+        bot.reply_to(message, "Admin only.")
+        return
+    try:
+        fn(message)
+    except Exception as e:
+        logger.error(f"Reply keyboard action failed ({action}): {e}", exc_info=True)
+        bot.reply_to(message, "Something went wrong. Please try again.")
+
+@bot.message_handler(commands=['deploy'])
+def menu_deploy(message): _logic_upload_file(message)
+
+@bot.message_handler(commands=['mybots'])
+def menu_mybots(message): _logic_check_files(message)
+
+@bot.message_handler(commands=['logs'])
+def menu_logs(message): view_all_logs(message)
+
+@bot.message_handler(commands=['restart'])
+def menu_restart(message):
+    bot.reply_to(message, "Open /mybots and select the bot to restart.")
+
+@bot.message_handler(commands=['stop'])
+def menu_stop(message):
+    bot.reply_to(message, "Open /mybots and select the bot to stop.")
+
+@bot.message_handler(commands=['credits'])
+def menu_credits(message): _logic_my_credits(message)
+
+@bot.message_handler(commands=['broadcast'])
+def menu_broadcast(message): _logic_broadcast_init(message)
+
+# ══════════════════════════════════════════════════════
+#  OFFICIAL TELEGRAM MENU COMMANDS
+# ══════════════════════════════════════════════════════
+def configure_bot_menu():
+    """Remove the official command/menu list; navigation is on the reply keyboard."""
+    try:
+        bot.delete_my_commands(scope=types.BotCommandScopeDefault())
+        bot.delete_my_commands(scope=types.BotCommandScopeChat(chat_id=OWNER_ID))
+        for aid in list(admin_ids):
+            if aid != OWNER_ID:
+                bot.delete_my_commands(scope=types.BotCommandScopeChat(chat_id=aid))
+        logger.info("Official Telegram command menu cleared; reply keyboard is the main UI.")
+    except Exception as e:
+        logger.error(f"Menu command cleanup failed: {e}", exc_info=True)
 
 # ══════════════════════════════════════════════════════
 #  CLEANUP & MAIN
@@ -2427,7 +3057,7 @@ atexit.register(cleanup)
 if __name__ == '__main__':
     logger.info(
         f"\n{'═'*50}\n"
-        f"  ⚡ {BOT_NAME}\n"
+        f"   {BOT_NAME}\n"
         f"  Dev    : {CREDIT}\n"
         f"  Bot    : {BOT_USERNAME}\n"
         f"  Owner  : {OWNER_ID}\n"
@@ -2435,7 +3065,8 @@ if __name__ == '__main__':
         f"{'═'*50}"
     )
     keep_alive()
-    logger.info("🚀 Polling started...")
+    configure_bot_menu()
+    logger.info("Polling started...")
     while True:
         try:
             bot.infinity_polling(logger_level=logging.INFO, timeout=60, long_polling_timeout=30)
@@ -2444,7 +3075,7 @@ if __name__ == '__main__':
         except requests.exceptions.ConnectionError as e:
             logger.error(f"ConnectionError: {e} — retry in 15s..."); time.sleep(15)
         except Exception as e:
-            logger.critical(f"💥 Polling crash: {e}", exc_info=True)
+            logger.critical(f"Polling crash: {e}", exc_info=True)
             time.sleep(30)
         finally:
             time.sleep(1)
