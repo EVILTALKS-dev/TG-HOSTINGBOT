@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 # ╔══════════════════════════════════════════════════════╗
-# ║         JEXXY CLOUD BOT — Premium Edition           ║
-# ║      Owner/Dev: @JEXXYNOIRMYATTITUDE                ║
+# ║         EVIL HOST — Premium Edition           ║
+# ║      Owner/Dev: @EVILTALKS               ║
 # ╚══════════════════════════════════════════════════════╝
 
-# --- JEXXY dependency bootstrap (runs before third-party imports) ---
+# --- EVIL dependency bootstrap (runs before third-party imports) ---
 import os as _bootstrap_os
 import sys as _bootstrap_sys
 import subprocess as _bootstrap_subprocess
 import importlib.util as _bootstrap_importlib
 import importlib.metadata as _bootstrap_metadata
 
-_BOOTSTRAP_DIR = _bootstrap_os.path.join(_bootstrap_os.path.abspath(_bootstrap_os.path.dirname(__file__)), ".jexxy_packages")
+_BOOTSTRAP_DIR = _bootstrap_os.path.join(_bootstrap_os.path.abspath(_bootstrap_os.path.dirname(__file__)), ".EVIL_packages")
 _bootstrap_os.makedirs(_BOOTSTRAP_DIR, exist_ok=True)
 if _BOOTSTRAP_DIR not in _bootstrap_sys.path:
     _bootstrap_sys.path.insert(0, _BOOTSTRAP_DIR)
@@ -49,12 +49,12 @@ def _ensure_bootstrap_package(module_name, package_name):
             text=True, timeout=600
         )
         if result.returncode != 0:
-            print(f"[JEXXY] Failed to install {package_name}:\n{result.stdout[-2000:]}")
+            print(f"[EVIL] Failed to install {package_name}:\n{result.stdout[-2000:]}")
             return False
         _bootstrap_importlib.invalidate_caches()
         return True
     except Exception as _e:
-        print(f"[JEXXY] Dependency bootstrap error for {package_name}: {_e}")
+        print(f"[EVIL] Dependency bootstrap error for {package_name}: {_e}")
         return False
 
 # These are required by the hosting bot itself. Uploaded-file dependencies
@@ -69,7 +69,7 @@ for _mod, _pkg in _BOOTSTRAP_DEPS.items():
     if not _ensure_bootstrap_package(_mod, _pkg):
         raise RuntimeError(f"Required dependency '{_mod}'is unavailable. Install package '{_pkg}'and restart.")
 
-# --- End JEXXY dependency bootstrap ---
+# --- End EVIL dependency bootstrap ---
 
 import telebot
 from html import escape as _html_escape
@@ -108,7 +108,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "JexxyCloudBot — Online & Blazing"
+    return "EVILCloudBot — Online & Blazing"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -133,7 +133,7 @@ TOKEN          = '8843932282:AAF8Vzm9yTlh0IeMLRwKbP-0G8wMbYOq4Go'
 OWNER_ID         = 8066849679
 ADMIN_ID       = 8066849679
 YOUR_USERNAME  = '@EVILTALKS'
-BOT_NAME       = "𝐄𝐯𝐢𝐥 𝐇𝐨𝐬𝐭"
+BOT_NAME       = "𝘌𝘷𝘪𝘭 𝘏𝘰𝘴𝘵"
 BOT_USERNAME   = "@EvilHostsBot"
 CREDIT         = "@EVILTALKS"
 
@@ -217,12 +217,12 @@ REFERRAL_BONUS    = 5       # credits referrer earns per successful referral
 UPLOAD_COST       = 1       # credits consumed per file upload
 
 # Welcome video
-WELCOME_VIDEO_URL = 'https://t.me/JEXXYKABOTKELIYAVIDOCHANNNELE/6'  # final welcome video
+WELCOME_VIDEO_URL = 'https://t.me/EVILTALKSBOTKALIYEVIDEOS/3'  # final welcome video
 
 # Folder setup
 BASE_DIR         = os.path.abspath(os.path.dirname(__file__))
 UPLOAD_BOTS_DIR  = os.path.join(BASE_DIR, 'upload_bots')
-DATA_DIR         = os.path.join(BASE_DIR, 'jexxy_data')
+DATA_DIR         = os.path.join(BASE_DIR, 'EVIL_data')
 DATABASE_PATH    = os.path.join(DATA_DIR, 'bot_data.db')
 
 os.makedirs(UPLOAD_BOTS_DIR, exist_ok=True)
@@ -302,13 +302,13 @@ for _method in ('send_message', 'send_photo', 'send_video', 'send_document',
     except Exception:
         pass
 
-# Every ordinary reply is promoted to the same JEXXY CLOUD visual language.
+# Every ordinary reply is promoted to the same EVIL CLOUD visual language.
 # Existing premium HTML cards are passed through untouched.
 _RAW_REPLY_TO = bot.reply_to
-def _jexxy_premium_reply_to(message, text, *args, **kwargs):
+def _EVIL_premium_reply_to(message, text, *args, **kwargs):
     try:
         raw = str(text or '')
-        if 'EVIL CLOUD BOT' in raw or '<blockquote>' in raw:
+        if 'EVIL HOST' in raw or '<blockquote>' in raw:
             return _RAW_REPLY_TO(message, text, *args, **kwargs)
         markup = kwargs.get('reply_markup')
         clean = re.sub(r'<[^>]+>', '', raw)
@@ -320,7 +320,7 @@ def _jexxy_premium_reply_to(message, text, *args, **kwargs):
     except Exception:
         return _RAW_REPLY_TO(message, text, *args, **kwargs)
 try:
-    bot.reply_to = _jexxy_premium_reply_to
+    bot.reply_to = _EVIL_premium_reply_to
 except Exception:
     pass
 
@@ -1321,7 +1321,7 @@ def send_log_file(message, log_path, log_filename):
 #  PREMIUM RESPONSE UI
 # ══════════════════════════════════════════════════════
 def premium_card(title, body, copy_value=None, copy_label="COPY CODE"):
-    """Consistent JEXXY CLOUD premium card.
+    """Consistent EVIL CLOUD premium card.
 
     Custom emoji are deliberately kept OUTSIDE blockquote entities because
     Telegram does not allow the custom-emoji entity to be nested in a
@@ -1330,7 +1330,7 @@ def premium_card(title, body, copy_value=None, copy_label="COPY CODE"):
     """
     title = _html_escape(str(title))
     text = (
-        f"{PE_BRAND}  <b>EVIL CLOUD BOT</b>\n"
+        f"{PE_BRAND}  <b>EVIL HOST</b>\n"
         f"<b>{title}</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"{body}\n"
@@ -1365,7 +1365,7 @@ def premium_send(chat_id, title, body, *, reply_markup=None, copy_value=None, co
 
 def premium_reply(message, title, body, *, reply_markup=None, copy_value=None,
                   copy_label="COPY CODE"):
-    """Send a consistent JEXXY CLOUD premium card instead of a plain reply."""
+    """Send a consistent EVIL CLOUD premium card instead of a plain reply."""
     try:
         return premium_send(
             message.chat.id, title, body,
@@ -1739,10 +1739,10 @@ def _logic_check_files(message):
         markup.add(premium_inline_button(f"{fn}  •  {ft.upper()}", callback_data=f'file_{user_id}_{fn}'))
     markup.add(premium_inline_button("BACK TO PANEL", callback_data='back_to_main'))
     body = f"{PE_VIEW} <b>{len(files)} hosted file(s)</b>\n{PE_OK} Select a file below to start, stop, restart, view logs or delete it.\n\n{PE_TIME} Status is checked live when you open a file."
-    text, _ = premium_card("MY FILES", body, copy_value="EVIL CLOUD BOT")
+    text, _ = premium_card("MY FILES", body, copy_value="EVIL HOST")
     # Put COPY CODE above the file controls.
     try:
-        markup.keyboard.insert(0, [types.InlineKeyboardButton("COPY CODE", icon_custom_emoji_id=PREMIUM_BUTTON_IDS["ok"], style="success", copy_text=types.CopyTextButton(text="EVIL CLOUD BOT"))])
+        markup.keyboard.insert(0, [types.InlineKeyboardButton("COPY CODE", icon_custom_emoji_id=PREMIUM_BUTTON_IDS["ok"], style="success", copy_text=types.CopyTextButton(text="EVIL HOST"))])
     except Exception:
         pass
     bot.send_message(message.chat.id, text, reply_markup=markup, parse_mode='HTML')
@@ -2430,10 +2430,10 @@ def check_files_callback(call):
     bot.answer_callback_query(call.id)
     if not files:
         body = f"{PE_VIEW} <b>No hosted files found.</b>\n\n{PE_OK} Upload a <code>.py</code>, <code>.js</code> or <code>.zip</code> file to begin."
-        text, _ = premium_card("MY FILES", body, copy_value="EVIL CLOUD BOT")
+        text, _ = premium_card("MY FILES", body, copy_value="EVIL HOST")
         markup = types.InlineKeyboardMarkup(row_width=1)
         try:
-            markup.add(types.InlineKeyboardButton("COPY CODE", icon_custom_emoji_id=PREMIUM_BUTTON_IDS["ok"], style="success", copy_text=types.CopyTextButton(text="EVIL CLOUD BOT")))
+            markup.add(types.InlineKeyboardButton("COPY CODE", icon_custom_emoji_id=PREMIUM_BUTTON_IDS["ok"], style="success", copy_text=types.CopyTextButton(text="EVIL HOST")))
         except Exception: pass
         markup.add(premium_inline_button("BACK TO PANEL", callback_data='back_to_main'))
     else:
@@ -2443,11 +2443,11 @@ def check_files_callback(call):
             label = f"{fn}  •  {ft.upper()}  •  {'RUNNING' if running else 'STOPPED'}"
             markup.add(premium_inline_button(label, callback_data=f'file_{user_id}_{fn}'))
         try:
-            markup.add(types.InlineKeyboardButton("COPY CODE", icon_custom_emoji_id=PREMIUM_BUTTON_IDS["ok"], style="success", copy_text=types.CopyTextButton(text="EVIL CLOUD BOT")))
+            markup.add(types.InlineKeyboardButton("COPY CODE", icon_custom_emoji_id=PREMIUM_BUTTON_IDS["ok"], style="success", copy_text=types.CopyTextButton(text="EVIL HOST")))
         except Exception: pass
         markup.add(premium_inline_button("BACK TO PANEL", callback_data='back_to_main'))
         body = f"{PE_VIEW} <b>{len(files)} hosted file(s)</b>\n{PE_OK} Select a file to manage its process.\n{PE_TIME} Live status is checked when selected."
-        text, _ = premium_card("MY FILES", body, copy_value="EVIL CLOUD BOT")
+        text, _ = premium_card("MY FILES", body, copy_value="EVIL HOST")
     try:
         bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode='HTML')
     except telebot.apihelper.ApiTelegramException as e:
