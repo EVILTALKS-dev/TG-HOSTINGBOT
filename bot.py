@@ -132,7 +132,7 @@ def keep_alive():
 TOKEN          = '8843932282:AAF8Vzm9yTlh0IeMLRwKbP-0G8wMbYOq4Go'
 OWNER_ID         = 8066849679
 ADMIN_ID       = 8066849679
-YOUR_USERNAME  = '@EVILTALKS"
+YOUR_USERNAME  = '@EVILTALKS'
 BOT_NAME       = "𝐄𝐯𝐢𝐥 𝐇𝐨𝐬𝐭"
 BOT_USERNAME   = "@EvilHostsBot"
 CREDIT         = "@EVILTALKS"
