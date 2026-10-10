@@ -133,7 +133,7 @@ def keep_alive():
 # ══════════════════════════════════════════════════════
 #  CONFIGURATION
 # ══════════════════════════════════════════════════════
-TOKEN          = '8843932282:AAGRejTsyr9msS0tdckQOd_dKUgXpTDV1qk'
+TOKEN          = '8843932282:AAELdcSw_w4_Jr8kggD8lIFJkzzOkRz7720'
 OWNER_ID       = 8066849679
 ADMIN_ID       = 8066849679
 YOUR_USERNAME  = '@EVILTALKS'
